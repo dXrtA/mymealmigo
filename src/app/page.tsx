@@ -12,7 +12,7 @@ import { ProjectWebsite } from "@/components/ProjectWebsite";
 import { useContent } from "@/context/ContentProvider";
 import { Hero } from "@/components/hero";
 import { useAuth } from "@/context/AuthContext";
-
+import { Download } from "@/components/download"; // ✅ bring back Download
 
 export default function Home() {
   const router = useRouter();
@@ -20,7 +20,6 @@ export default function Home() {
   const [showSignUp, setShowSignUp] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
-  // ⬇️ Only free | premium (nutritionist removed)
   const [selectedRole, setSelectedRole] = useState<"free" | "premium" | null>(null);
 
   const { hero, features, howItWorks, pricing, testimonials, isLoading } = useContent();
@@ -32,11 +31,6 @@ export default function Home() {
 
   const mappedFeatures = features;
 
-  // ⬇️ Smart handler:
-  // - Logged OUT: open SignUpModal (free default or premium if pressed in Pricing)
-  // - Logged IN:
-  //    - premium CTA -> open UpgradeToPremiumModal
-  //    - any other CTA (e.g., "Get Started") -> go to /account
   const openModal = (role?: "free" | "premium") => {
     if (user) {
       if (role === "premium") {
@@ -64,14 +58,13 @@ export default function Home() {
       ) : (
         <>
           <Hero
-            title1={hero.title1 || "Your Health"}
+            title1={hero.title1 || "Test"}
             title2={hero.title2 || "Made Simple"}
             description={hero.description || "Track your diet and health with ease."}
             videoURL={hero.videoURL}
             imageURL={hero.imageURL}
             mediaType={hero.mediaType || "image"}
           >
-            {/* Do NOT show Download here per your preference */}
             {!user && (
               <button
                 onClick={() => openModal("free")}
@@ -95,16 +88,18 @@ export default function Home() {
           </Hero>
 
           <Features features={mappedFeatures} />
-          {/* Pricing will call onOpenModal('premium') for premium CTAs */}
           <Pricing plans={pricing} onOpenModal={openModal} />
           <Testimonials testimonials={testimonials} />
           <HowItWorks steps={howItWorks} />
+
+          {/* ✅ Download section on the home page */}
+          <Download />
 
           {/* Modals */}
           <SignUpModal
             isOpen={showSignUp}
             onClose={closeModal}
-            initialRole={selectedRole || undefined} // safe; 'nutritionist' removed everywhere here
+            initialRole={selectedRole || undefined}
           />
           <UpgradeToPremiumModal
             isOpen={showUpgrade}
