@@ -5,12 +5,24 @@ import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
+type Sex = "male" | "female" | "other";
+
 type Profile = {
   displayName?: string;
-  birthday?: string;     // ISO yyyy-mm-dd
+  birthday?: string;       // ISO yyyy-mm-dd
   heightCm?: number;
   weightKg?: number;
-  sex?: "male" | "female" | "other";
+  sex?: Sex;
+};
+
+type FirestoreUserDoc = {
+  name?: string;
+  profile?: {
+    birthday?: string;
+    heightCm?: number;
+    weightKg?: number;
+    sex?: Sex;
+  };
 };
 
 export default function ProfileForm() {
@@ -22,28 +34,36 @@ export default function ProfileForm() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
     (async () => {
       if (!user) return;
       try {
         const ref = doc(db, "users", user.uid);
         const snap = await getDoc(ref);
-        if (!mounted) return;
-        const data = snap.data() || {};
+        if (cancelled) return;
+
+        const data = (snap.data() ?? {}) as FirestoreUserDoc;
+
         setProfile({
-          displayName: data.name || user.displayName || "",
-          birthday: data.profile?.birthday || "",
+          displayName: data.name ?? user.displayName ?? "",
+          birthday: data.profile?.birthday ?? "",
           heightCm: data.profile?.heightCm ?? undefined,
           weightKg: data.profile?.weightKg ?? undefined,
-          sex: data.profile?.sex || "other",
+          sex: data.profile?.sex ?? "other",
         });
-      } catch (e: any) {
-        setErr(e?.message || "Failed to load profile.");
+      } catch (e: unknown) {
+        const message =
+          typeof e === "object" && e && "message" in e
+            ? String((e as { message?: string }).message)
+            : "Failed to load profile.";
+        setErr(message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const save = async () => {
@@ -57,21 +77,28 @@ export default function ProfileForm() {
         name: profile.displayName ?? null,
         profile: {
           birthday: profile.birthday || null,
-          heightCm: profile.heightCm ?? null,
-          weightKg: profile.weightKg ?? null,
-          sex: profile.sex || "other",
+          heightCm: typeof profile.heightCm === "number" ? profile.heightCm : null,
+          weightKg: typeof profile.weightKg === "number" ? profile.weightKg : null,
+          sex: (profile.sex as Sex) ?? "other",
           updatedAt: serverTimestamp(),
         },
         updatedAt: serverTimestamp(),
       });
       setMsg("Profile saved.");
-    } catch (e: any) {
-      setErr(e?.message || "Failed to save profile.");
+      // auto-clear success after a moment
+      setTimeout(() => setMsg(null), 2500);
+    } catch (e: unknown) {
+      const message =
+        typeof e === "object" && e && "message" in e
+          ? String((e as { message?: string }).message)
+          : "Failed to save profile.";
+      setErr(message);
     } finally {
       setSaving(false);
     }
   };
 
+  if (!user) return null;
   if (loading) return <div className="text-sm text-gray-500">Loading profile…</div>;
 
   return (
@@ -87,7 +114,7 @@ export default function ProfileForm() {
           <input
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.displayName ?? ""}
-            onChange={(e) => setProfile(p => ({ ...p, displayName: e.target.value }))}
+            onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
           />
         </label>
 
@@ -97,27 +124,43 @@ export default function ProfileForm() {
             type="date"
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.birthday ?? ""}
-            onChange={(e) => setProfile(p => ({ ...p, birthday: e.target.value }))}
+            onChange={(e) => setProfile((p) => ({ ...p, birthday: e.target.value }))}
           />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-700">Height (cm)</span>
           <input
-            type="number" inputMode="decimal" min={0} step="0.1"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.1"
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.heightCm ?? ""}
-            onChange={(e) => setProfile(p => ({ ...p, heightCm: e.target.value ? Number(e.target.value) : undefined }))}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                heightCm: e.target.value ? Number(e.target.value) : undefined,
+              }))
+            }
           />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-700">Weight (kg)</span>
           <input
-            type="number" inputMode="decimal" min={0} step="0.1"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.1"
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.weightKg ?? ""}
-            onChange={(e) => setProfile(p => ({ ...p, weightKg: e.target.value ? Number(e.target.value) : undefined }))}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                weightKg: e.target.value ? Number(e.target.value) : undefined,
+              }))
+            }
           />
         </label>
 
@@ -126,7 +169,9 @@ export default function ProfileForm() {
           <select
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.sex ?? "other"}
-            onChange={(e) => setProfile(p => ({ ...p, sex: e.target.value as Profile["sex"] }))}
+            onChange={(e) =>
+              setProfile((p) => ({ ...p, sex: e.target.value as Sex }))
+            }
           >
             <option value="male">Male</option>
             <option value="female">Female</option>

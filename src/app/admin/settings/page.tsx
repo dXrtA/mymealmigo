@@ -44,6 +44,10 @@ const defaultSettings: Settings = {
   appStoreLinks: { googlePlay: "", appStore: "", apk: "" },
 };
 
+// helpers for safe error reading (no `any`)
+const hasCode = (x: unknown): x is { code: string } =>
+  typeof x === "object" && x !== null && typeof (x as Record<string, unknown>).code === "string";
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
@@ -51,56 +55,94 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string>("");
 
-  const docRef = doc(db, "settings", "main");
+  // typed field setter – no `any`
+  const setSectionField = <
+    S extends keyof Settings,
+    K extends keyof Settings[S]
+  >(
+    section: S,
+    key: K,
+    value: Settings[S][K]
+  ) => {
+    setSettings((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [key]: value,
+      },
+    }));
+  };
 
-  const load = async () => {
+  // Load on mount (when user exists) without a missing-deps warning
+  useEffect(() => {
+    if (!user) return;
+
+    const run = async () => {
+      setLoading(true);
+      setMsg("");
+      try {
+        const ref = doc(db, "settings", "main");
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, defaultSettings);
+          setSettings(defaultSettings);
+        } else {
+          setSettings(snap.data() as Settings);
+        }
+      } catch (e: unknown) {
+        console.error("Settings load error:", e);
+        setMsg(
+          hasCode(e) && e.code === "permission-denied"
+            ? "Permission denied. Check Firestore rules."
+            : "Failed to load settings."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void run();
+  }, [user]);
+
+  const refresh = async () => {
+    if (!user) return;
     setLoading(true);
     setMsg("");
     try {
-      const snap = await getDoc(docRef);
+      const ref = doc(db, "settings", "main");
+      const snap = await getDoc(ref);
       if (!snap.exists()) {
-        await setDoc(docRef, defaultSettings);
+        await setDoc(ref, defaultSettings);
         setSettings(defaultSettings);
       } else {
         setSettings(snap.data() as Settings);
       }
-    } catch (e: any) {
-      console.error("Settings load error:", e);
+      setMsg("Settings refreshed.");
+      setTimeout(() => setMsg(""), 1800);
+    } catch (e: unknown) {
+      console.error("Settings refresh error:", e);
       setMsg(
-        e?.code === "permission-denied"
+        hasCode(e) && e.code === "permission-denied"
           ? "Permission denied. Check Firestore rules."
-          : "Failed to load settings."
+          : "Failed to refresh."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (user) load();
-  }, [user]); // one-time fetch when mounted & authed
-
-  const handleChange =
-    (section: keyof Settings) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = e.target;
-      setSettings((prev) => ({
-        ...prev,
-        [section]: { ...(prev as any)[section], [name]: value },
-      }));
-    };
-
   const save = async () => {
     setSaving(true);
     setMsg("");
     try {
-      await setDoc(docRef, settings, { merge: true });
+      const ref = doc(db, "settings", "main");
+      await setDoc(ref, settings, { merge: true });
       setMsg("Settings saved!");
       setTimeout(() => setMsg(""), 2500);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Settings save error:", e);
       setMsg(
-        e?.code === "permission-denied"
+        hasCode(e) && e.code === "permission-denied"
           ? "Permission denied. Check Firestore rules."
           : "Failed to save."
       );
@@ -109,15 +151,20 @@ export default function SettingsPage() {
     }
   };
 
+  // strongly-typed key lists (lets us use settings.section[k] directly)
+  const socialKeys = ["facebook", "twitter", "instagram", "youtube"] as const;
+  const apiKeys = ["geminiApiKey", "stripePublishableKey", "stripeSecretKey"] as const;
+  const storeKeys = ["googlePlay", "appStore", "apk"] as const;
+
   return (
     <ProtectedRoute requireAdmin>
       <div className="max-w-3xl">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Settings</h1>
           <button
-            onClick={load}
+            onClick={refresh}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-gray-50 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-2 hover:bg-gray-50 disabled:opacity-60"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
@@ -125,51 +172,47 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {msg && <p className="text-sm mb-3">{msg}</p>}
+        {msg && <p className="mb-3 text-sm">{msg}</p>}
 
         {loading ? (
-          <div className="p-6 bg-white border rounded-xl">Loading…</div>
+          <div className="rounded-xl border bg-white p-6">Loading…</div>
         ) : (
-          <div className="space-y-6 bg-white p-6 rounded-xl border">
+          <div className="space-y-6 rounded-xl border bg-white p-6">
             {/* General */}
             <section>
-              <h2 className="text-lg font-medium mb-3">General</h2>
+              <h2 className="mb-3 text-lg font-medium">General</h2>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">Site Name</label>
+                  <label className="mb-1 block text-sm text-gray-700">Site Name</label>
                   <input
-                    name="siteName"
                     value={settings.general.siteName}
-                    onChange={handleChange("general")}
-                    className="w-full px-3 py-2 border rounded-md"
+                    onChange={(e) => setSectionField("general", "siteName", e.target.value)}
+                    className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">Description</label>
+                  <label className="mb-1 block text-sm text-gray-700">Description</label>
                   <input
-                    name="siteDescription"
                     value={settings.general.siteDescription}
-                    onChange={handleChange("general")}
-                    className="w-full px-3 py-2 border rounded-md"
+                    onChange={(e) => setSectionField("general", "siteDescription", e.target.value)}
+                    className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">Contact Email</label>
+                  <label className="mb-1 block text-sm text-gray-700">Contact Email</label>
                   <input
                     type="email"
-                    name="contactEmail"
                     value={settings.general.contactEmail}
-                    onChange={handleChange("general")}
-                    className="w-full px-3 py-2 border rounded-md"
+                    onChange={(e) => setSectionField("general", "contactEmail", e.target.value)}
+                    className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">Phone</label>
+                  <label className="mb-1 block text-sm text-gray-700">Phone</label>
                   <input
-                    name="phoneNumber"
                     value={settings.general.phoneNumber}
-                    onChange={handleChange("general")}
-                    className="w-full px-3 py-2 border rounded-md"
+                    onChange={(e) => setSectionField("general", "phoneNumber", e.target.value)}
+                    className="w-full rounded-md border px-3 py-2"
                   />
                 </div>
               </div>
@@ -177,21 +220,15 @@ export default function SettingsPage() {
 
             {/* Social */}
             <section>
-              <h2 className="text-lg font-medium mb-3">Social Links</h2>
+              <h2 className="mb-3 text-lg font-medium">Social Links</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {(["facebook", "twitter", "instagram", "youtube"] as const).map((k) => (
+                {socialKeys.map((k) => (
                   <div key={k}>
-                    <label className="block text-sm text-gray-700 mb-1 capitalize">{k}</label>
+                    <label className="mb-1 block text-sm capitalize text-gray-700">{k}</label>
                     <input
-                      name={k}
-                      value={(settings.socialLinks as any)[k]}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          socialLinks: { ...prev.socialLinks, [k]: e.target.value },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border rounded-md"
+                      value={settings.socialLinks[k]}
+                      onChange={(e) => setSectionField("socialLinks", k, e.target.value)}
+                      className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
                 ))}
@@ -200,22 +237,16 @@ export default function SettingsPage() {
 
             {/* API Keys */}
             <section>
-              <h2 className="text-lg font-medium mb-3">API Keys</h2>
+              <h2 className="mb-3 text-lg font-medium">API Keys</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {(["geminiApiKey", "stripePublishableKey", "stripeSecretKey"] as const).map((k) => (
+                {apiKeys.map((k) => (
                   <div key={k}>
-                    <label className="block text-sm text-gray-700 mb-1">{k}</label>
+                    <label className="mb-1 block text-sm text-gray-700">{k}</label>
                     <input
                       type="password"
-                      name={k}
-                      value={(settings.apiKeys as any)[k]}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          apiKeys: { ...prev.apiKeys, [k]: e.target.value },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border rounded-md"
+                      value={settings.apiKeys[k]}
+                      onChange={(e) => setSectionField("apiKeys", k, e.target.value)}
+                      className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
                 ))}
@@ -224,21 +255,15 @@ export default function SettingsPage() {
 
             {/* App Store Links */}
             <section>
-              <h2 className="text-lg font-medium mb-3">App Links</h2>
+              <h2 className="mb-3 text-lg font-medium">App Links</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                {(["googlePlay", "appStore", "apk"] as const).map((k) => (
+                {storeKeys.map((k) => (
                   <div key={k}>
-                    <label className="block text-sm text-gray-700 mb-1 capitalize">{k}</label>
+                    <label className="mb-1 block text-sm capitalize text-gray-700">{k}</label>
                     <input
-                      name={k}
-                      value={(settings.appStoreLinks as any)[k]}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          appStoreLinks: { ...prev.appStoreLinks, [k]: e.target.value },
-                        }))
-                      }
-                      className="w-full px-3 py-2 border rounded-md"
+                      value={settings.appStoreLinks[k]}
+                      onChange={(e) => setSectionField("appStoreLinks", k, e.target.value)}
+                      className="w-full rounded-md border px-3 py-2"
                     />
                   </div>
                 ))}
@@ -249,7 +274,7 @@ export default function SettingsPage() {
               <button
                 onClick={save}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#FF6F61] text-white hover:opacity-90 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md bg-[#FF6F61] px-4 py-2 text-white hover:opacity-90 disabled:opacity-60"
               >
                 <Save className="h-5 w-5" />
                 {saving ? "Saving…" : "Save Settings"}

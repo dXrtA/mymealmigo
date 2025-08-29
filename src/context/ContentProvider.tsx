@@ -1,9 +1,17 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot, collection, onSnapshot as onCol } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot as onDocSnapshot,
+  onSnapshot as onColSnapshot,
+  DocumentData,
+  Timestamp,
+} from "firebase/firestore";
 
+/** Types */
 type HeroContent = {
   title1: string;
   title2: string;
@@ -11,6 +19,7 @@ type HeroContent = {
   imageURL?: string;
   videoURL?: string;
   mediaType: "image" | "video";
+  /** Optional: if you store the file path for later deletions */
   storagePath?: string;
 };
 
@@ -60,10 +69,14 @@ type ContentContextType = {
   isLoading: boolean;
 };
 
-const ContentContext = createContext<ContentContextType | null>(null);
-
-const toArray = <T,>(v: any): T[] =>
-  Array.isArray(v) ? v : v && typeof v === "object" ? (Object.values(v) as T[]) : [];
+/** Helpers */
+const toArray = <T,>(v: unknown): T[] => {
+  if (Array.isArray(v)) return v as T[];
+  if (v && typeof v === "object") {
+    return Object.values(v as Record<string, unknown>) as T[];
+  }
+  return [];
+};
 
 const DEFAULT: LandingPageContent = {
   hero: { title1: "", title2: "", description: "", imageURL: "", videoURL: "", mediaType: "image" },
@@ -79,6 +92,8 @@ const DEFAULT: LandingPageContent = {
   },
 };
 
+const ContentContext = createContext<ContentContextType | null>(null);
+
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<LandingPageContent>(DEFAULT);
   const [testimonials, setTestimonials] = useState<AppRating[]>([]);
@@ -86,23 +101,22 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [loadedRatings, setLoadedRatings] = useState(false);
 
   useEffect(() => {
-    // Live listener to the ONE doc your CMS writes to
-    const unsubDoc = onSnapshot(
+    // Live listener to the CMS document
+    const unsubDoc = onDocSnapshot(
       doc(db, "landingPageContent", "main"),
       (snap) => {
         if (!snap.exists()) {
-          console.warn("[Content] landingPageContent/main missing. Using defaults.");
           setContent(DEFAULT);
           setLoadedDoc(true);
           return;
         }
+
         const raw = snap.data() as Partial<LandingPageContent>;
-        // Normalize arrays so components never crash
         const normalized: LandingPageContent = {
           hero: {
             ...DEFAULT.hero,
             ...(raw.hero || {}),
-            mediaType: (raw?.hero?.mediaType as "image" | "video") || "image",
+            mediaType: (raw.hero?.mediaType as "image" | "video") || "image",
           },
           features: toArray<Feature>(raw.features),
           howItWorks: toArray<Step>(raw.howItWorks),
@@ -112,42 +126,46 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
           })),
           testimonialSettings: raw.testimonialSettings || DEFAULT.testimonialSettings,
         };
-        console.log("[Content] live update:", normalized);
+
         setContent(normalized);
         setLoadedDoc(true);
       },
-      (err) => {
-        console.error("[Content] Failed to read landingPageContent/main:", err);
+      () => {
         setContent(DEFAULT);
         setLoadedDoc(true);
       }
     );
 
     // Live listener to public testimonials
-    const unsubCol = onCol(
+    const unsubCol = onColSnapshot(
       collection(db, "appRating"),
       (qs) => {
         const list: AppRating[] = qs.docs.map((d) => {
-          const x: any = d.data() || {};
+          const x = d.data() as DocumentData;
+
+          let submittedISO = new Date().toISOString();
+          const st = x?.submittedTime;
+          if (st instanceof Timestamp) {
+            submittedISO = st.toDate().toISOString();
+          } else if (typeof st === "string") {
+            submittedISO = st;
+          }
+
           return {
             id: d.id,
-            name: x.name || "",
-            text: x.text || "",
-            rating: x.rating || 0,
-            submittedTime:
-              x.submittedTime?.toDate?.()?.toISOString?.() ||
-              x.submittedTime ||
-              new Date().toISOString(),
-            photoURL: x.photoURL || "",
-            isVisible: x.isVisible !== false, // default true
+            name: typeof x?.name === "string" ? x.name : "",
+            text: typeof x?.text === "string" ? x.text : "",
+            rating: typeof x?.rating === "number" ? x.rating : 0,
+            submittedTime: submittedISO,
+            photoURL: typeof x?.photoURL === "string" ? x.photoURL : "",
+            isVisible: x?.isVisible !== false, // default true
           };
         });
-        console.log("[Content] testimonials update:", list.length);
+
         setTestimonials(list);
         setLoadedRatings(true);
       },
-      (err) => {
-        console.error("[Content] Failed to read appRating:", err);
+      () => {
         setTestimonials([]);
         setLoadedRatings(true);
       }
@@ -162,25 +180,29 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   const isLoading = !loadedDoc || !loadedRatings;
 
   const value = useMemo<ContentContextType>(() => {
-    // Apply admin testimonial filters on the client
-    const s = content.testimonialSettings || DEFAULT.testimonialSettings!;
+    const settings: TestimonialSettings =
+      content.testimonialSettings ?? DEFAULT.testimonialSettings!;
+
     let shown = testimonials
       .filter((t) => t.isVisible !== false)
-      .filter((t) => t.rating >= (s.minRating ?? 0))
-      .filter((t) => !s.showOnlyWithText || (t.text && t.text.trim() !== ""));
+      .filter((t) => t.rating >= (settings.minRating ?? 0))
+      .filter((t) => !settings.showOnlyWithText || (t.text && t.text.trim() !== ""));
 
     shown = shown.sort((a, b) => {
-      if (s.sortField === "rating") {
-        return s.sortDirection === "asc" ? a.rating - b.rating : b.rating - a.rating;
-      } else {
-        const aT = new Date(a.submittedTime).getTime() || 0;
-        const bT = new Date(b.submittedTime).getTime() || 0;
-        return s.sortDirection === "asc" ? aT - bT : bT - aT;
+      if (settings.sortField === "rating") {
+        return settings.sortDirection === "asc" ? a.rating - b.rating : b.rating - a.rating;
       }
+      const aT = Number.isFinite(new Date(a.submittedTime).getTime())
+        ? new Date(a.submittedTime).getTime()
+        : 0;
+      const bT = Number.isFinite(new Date(b.submittedTime).getTime())
+        ? new Date(b.submittedTime).getTime()
+        : 0;
+      return settings.sortDirection === "asc" ? aT - bT : bT - aT;
     });
 
-    if (s.maxTestimonials && s.maxTestimonials > 0) {
-      shown = shown.slice(0, s.maxTestimonials);
+    if (settings.maxTestimonials && settings.maxTestimonials > 0) {
+      shown = shown.slice(0, settings.maxTestimonials);
     }
 
     return {
@@ -192,6 +214,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       isLoading,
     };
   }, [content, testimonials, isLoading]);
+
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }

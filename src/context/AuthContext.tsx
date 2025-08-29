@@ -1,11 +1,25 @@
 "use client";
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import type { User } from "firebase/auth";
 import { db, onAuthStateChangedClient } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-type AuthCtx = { user: User | null; loading: boolean; isAdmin: boolean; };
-const AuthContext = createContext<AuthCtx>({ user: null, loading: true, isAdmin: false });
+type AuthCtx = {
+  user: User | null;
+  loading: boolean;
+  isAdmin: boolean;
+};
+
+type FirestoreUserDoc = {
+  role?: string;
+};
+
+const AuthContext = createContext<AuthCtx>({
+  user: null,
+  loading: true,
+  isAdmin: false,
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -13,25 +27,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChangedClient(async (u) => {
+    let cancelled = false;
+
+    const unsub = onAuthStateChangedClient(async (u: User | null) => {
+      if (cancelled) return;
+
       setUser(u);
+
       if (u) {
         try {
           const snap = await getDoc(doc(db, "users", u.uid));
-          setIsAdmin((snap.exists() && (snap.data() as any).role?.toLowerCase?.() === "admin") || false);
+          if (!cancelled) {
+            const data = (snap.data() ?? {}) as FirestoreUserDoc;
+            const role = typeof data.role === "string" ? data.role.toLowerCase() : "";
+            setIsAdmin(role === "admin");
+          }
         } catch {
-          setIsAdmin(false);
+          if (!cancelled) setIsAdmin(false);
         }
       } else {
         setIsAdmin(false);
       }
-      setLoading(false);
+
+      if (!cancelled) setLoading(false);
     });
-    return () => { try { unsub(); } catch {} };
+
+    return () => {
+      cancelled = true;
+      try {
+        unsub(); // ensure we detach the listener
+      } catch {
+        // ignore
+      }
+    };
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, isAdmin }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, loading, isAdmin }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export function useAuth() { return useContext(AuthContext); }
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
 export { AuthContext };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { db, storage, getClientAuth } from '@/lib/firebase';
+import { getClientAuth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -14,7 +14,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
     let cancelled = false;
 
     (async () => {
-      const auth = await getClientAuth();   // 👈 await the Promise
+      const auth = await getClientAuth();   
       if (!auth) {
         // No auth on the server or something went wrong -> send to login
         if (!cancelled) router.replace('/login');

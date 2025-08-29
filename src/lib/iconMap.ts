@@ -1,12 +1,10 @@
-import { BarChart2, BookOpen, Lightbulb, LucideIcon, MessageSquare } from "lucide-react";
-import { Utensils, LineChart, UserRound, Apple, Dumbbell, Bell, ScanLine } from "lucide-react";
+import { BarChart2, BookOpen, Lightbulb, LucideIcon, MessageSquare, Utensils, ScanLine } from "lucide-react";
 
 export const iconMap: { [key: string]: LucideIcon } = {
   Utensils,
-  LineChart,
+  BarChart2,
   BookOpen,
   Lightbulb,
   MessageSquare,
-  BarChart2,
   ScanLine,
 };

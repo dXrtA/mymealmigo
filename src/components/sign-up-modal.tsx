@@ -105,9 +105,9 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         message:
           'We sent a verification link to your email. Verify, then log in. You can upgrade anytime from your Account page.',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || 'Failed to create account. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }

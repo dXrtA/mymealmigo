@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
-import { collection, doc, setDoc, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, deleteDoc, DocumentData } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -13,8 +13,8 @@ import { useAuth } from "@/context/AuthContext";
 
 interface Option {
   name: string;
-  icon?: string;        // Optional
-  description?: string; // Optional, used for dietTypes
+  icon?: string;
+  description?: string;
 }
 
 interface DropdownOption {
@@ -28,71 +28,65 @@ export default function DropdownManagerPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [dropdownIdToDelete, setDropdownIdToDelete] = useState<string | null>(null);
-  const [newOptions, setNewOptions] = useState<{ [key: string]: { name: string; icon?: string; description?: string } }>({});
+  const [newOptions, setNewOptions] = useState<Record<string, { name: string; icon?: string; description?: string }>>({});
   const { user, loading: authLoading, isAdmin } = useAuth();
   const router = useRouter();
 
-  // dropdowns that require icons
-  const iconRequiredDropdowns = ["allergies", "dietTypes"];
-
   useEffect(() => {
     if (authLoading) return;
-    if (!user || !isAdmin) {
-      router.push("/login");
-    }
+    if (!user || !isAdmin) router.push("/login");
   }, [user, authLoading, isAdmin, router]);
-
-  // Loader (non-streaming)
-  const loadDropdowns = async () => {
-    try {
-      const snap = await getDocs(collection(db, "dropDownOptions"));
-      const dropdownList: DropdownOption[] = snap.docs.map((d) => ({
-        id: d.id,
-        options: (d.data() as any)?.options || [],
-      }));
-      setDropdowns(dropdownList);
-    } catch (error: any) {
-      console.error("Error fetching dropDownOptions:", error);
-      setSaveMessage(`Error: Failed to fetch dropdowns. ${error.message}`);
-    }
-  };
 
   useEffect(() => {
     if (!user || !isAdmin) return;
-    loadDropdowns();
+
+    const unsub = onSnapshot(
+      collection(db, "dropDownOptions"),
+      (snap) => {
+        const list: DropdownOption[] = snap.docs.map((d) => {
+          const data = d.data() as DocumentData;
+          const opts = Array.isArray(data.options) ? (data.options as Option[]) : [];
+          return { id: d.id, options: opts };
+        });
+        setDropdowns(list);
+      },
+      (error) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        setSaveMessage(`Error: Failed to fetch dropdowns. ${msg}`);
+      }
+    );
+
+    return () => unsub();
   }, [user, isAdmin]);
 
   const handleAddOption = async (dropdownId: string) => {
-    const newOption = newOptions[dropdownId];
-    if (!newOption?.name?.trim()) {
+    const draft = newOptions[dropdownId];
+    if (!draft?.name.trim()) {
       setSaveMessage("Error: Option name cannot be empty.");
       return;
     }
 
     setIsSaving(true);
     try {
-      const current = dropdowns.find((d) => d.id === dropdownId);
-      if (!current) {
+      const dropdown = dropdowns.find((d) => d.id === dropdownId);
+      if (!dropdown) {
         setSaveMessage("Error: Dropdown not found.");
         return;
       }
-      const newOptionData: Option = {
-        name: newOption.name.trim(),
-        ...(newOption.icon ? { icon: newOption.icon.trim() } : {}),
-        ...(dropdownId === "dietTypes" && newOption.description ? { description: newOption.description.trim() } : {}),
+
+      const next: Option = {
+        name: draft.name.trim(),
+        ...(draft.icon ? { icon: draft.icon.trim() } : {}),
+        ...(dropdownId === "dietTypes" && draft.description ? { description: draft.description.trim() } : {}),
       };
-      const updatedOptions = [...current.options, newOptionData];
-      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: updatedOptions }, { merge: true });
 
-      // clear input
+      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: [...dropdown.options, next] }, { merge: true });
       setNewOptions((prev) => ({ ...prev, [dropdownId]: { name: "", icon: "", description: "" } }));
-
       setSaveMessage("Option added successfully!");
-      loadDropdowns();
-      setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error: any) {
-      console.error("Error adding option:", error);
-      setSaveMessage(`Error: ${error.message}`);
+      setTimeout(() => setSaveMessage(""), 2000);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setSaveMessage(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -101,21 +95,19 @@ export default function DropdownManagerPage() {
   const handleUpdateOption = async (dropdownId: string, index: number, field: keyof Option, value: string) => {
     setIsSaving(true);
     try {
-      const current = dropdowns.find((d) => d.id === dropdownId);
-      if (!current) {
+      const dropdown = dropdowns.find((d) => d.id === dropdownId);
+      if (!dropdown) {
         setSaveMessage("Error: Dropdown not found.");
         return;
       }
-      const updatedOptions = [...current.options];
-      updatedOptions[index] = { ...updatedOptions[index], [field]: value || undefined }; // empty -> undefined
-      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: updatedOptions }, { merge: true });
-
+      const updated = [...dropdown.options];
+      updated[index] = { ...updated[index], [field]: value || undefined };
+      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: updated }, { merge: true });
       setSaveMessage("Option updated successfully!");
-      loadDropdowns();
-      setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error: any) {
-      console.error("Error updating option:", error);
-      setSaveMessage(`Error: ${error.message}`);
+      setTimeout(() => setSaveMessage(""), 2000);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setSaveMessage(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -124,20 +116,18 @@ export default function DropdownManagerPage() {
   const handleDeleteOption = async (dropdownId: string, index: number) => {
     setIsSaving(true);
     try {
-      const current = dropdowns.find((d) => d.id === dropdownId);
-      if (!current) {
+      const dropdown = dropdowns.find((d) => d.id === dropdownId);
+      if (!dropdown) {
         setSaveMessage("Error: Dropdown not found.");
         return;
       }
-      const updatedOptions = current.options.filter((_, i) => i !== index);
-      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: updatedOptions }, { merge: true });
-
+      const updated = dropdown.options.filter((_, i) => i !== index);
+      await setDoc(doc(db, "dropDownOptions", dropdownId), { options: updated }, { merge: true });
       setSaveMessage("Option deleted successfully!");
-      loadDropdowns();
-      setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error: any) {
-      console.error("Error deleting option:", error);
-      setSaveMessage(`Error: ${error.message}`);
+      setTimeout(() => setSaveMessage(""), 2000);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setSaveMessage(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -145,22 +135,22 @@ export default function DropdownManagerPage() {
 
   const handleDeleteDropdown = async () => {
     if (!dropdownIdToDelete) return;
-
     setIsSaving(true);
     try {
       await deleteDoc(doc(db, "dropDownOptions", dropdownIdToDelete));
       setIsDeleteModalOpen(false);
       setDropdownIdToDelete(null);
       setSaveMessage("Dropdown deleted successfully!");
-      loadDropdowns();
-      setTimeout(() => setSaveMessage(""), 3000);
-    } catch (error: any) {
-      console.error("Error deleting dropdown:", error);
-      setSaveMessage(`Error: ${error.message}`);
+      setTimeout(() => setSaveMessage(""), 2000);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      setSaveMessage(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const iconRequiredDropdowns = ["allergies", "dietTypes"];
 
   if (authLoading) {
     return (
@@ -198,9 +188,7 @@ export default function DropdownManagerPage() {
               >
                 materialdesignicons.com <ExternalLink className="h-4 w-4 ml-1" />
               </a>{" "}
-              to browse and copy valid MaterialCommunityIcons names (e.g., {'peanut'}, {'carrot'}).
-              Ensure the icon name is supported by the mobile app. Icons are optional for other
-              categories like activityLevel.
+              to browse and copy valid MaterialCommunityIcons names (e.g., peanut, carrot).
             </p>
           </div>
 
@@ -230,7 +218,6 @@ export default function DropdownManagerPage() {
                         placeholder="Option name"
                         className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                       />
-
                       {dropdown.id === "dietTypes" && (
                         <input
                           value={option.description || ""}
@@ -239,16 +226,14 @@ export default function DropdownManagerPage() {
                           className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                         />
                       )}
-
                       {iconRequiredDropdowns.includes(dropdown.id) && (
                         <input
                           value={option.icon || ""}
                           onChange={(e) => handleUpdateOption(dropdown.id, index, "icon", e.target.value)}
-                          placeholder="Icon name (e.g., peanut)"
+                          placeholder="Icon name (e.g., carrot)"
                           className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                         />
                       )}
-
                       <Button variant="ghost" size="sm" onClick={() => handleDeleteOption(dropdown.id, index)}>
                         <Trash className="h-4 w-4 text-red-500" />
                       </Button>
@@ -259,44 +244,32 @@ export default function DropdownManagerPage() {
                     <input
                       value={newOptions[dropdown.id]?.name || ""}
                       onChange={(e) =>
-                        setNewOptions((prev) => ({
-                          ...prev,
-                          [dropdown.id]: { ...prev[dropdown.id], name: e.target.value },
-                        }))
+                        setNewOptions((prev) => ({ ...prev, [dropdown.id]: { ...prev[dropdown.id], name: e.target.value } }))
                       }
                       placeholder="Add new option name"
                       className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                     />
-
                     {dropdown.id === "dietTypes" && (
                       <input
                         value={newOptions[dropdown.id]?.description || ""}
                         onChange={(e) =>
-                          setNewOptions((prev) => ({
-                            ...prev,
-                            [dropdown.id]: { ...prev[dropdown.id], description: e.target.value },
-                          }))
+                          setNewOptions((prev) => ({ ...prev, [dropdown.id]: { ...prev[dropdown.id], description: e.target.value } }))
                         }
                         placeholder="Add description"
                         className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                       />
                     )}
-
                     {iconRequiredDropdowns.includes(dropdown.id) && (
                       <input
                         value={newOptions[dropdown.id]?.icon || ""}
                         onChange={(e) =>
-                          setNewOptions((prev) => ({
-                            ...prev,
-                            [dropdown.id]: { ...prev[dropdown.id], icon: e.target.value },
-                          }))
+                          setNewOptions((prev) => ({ ...prev, [dropdown.id]: { ...prev[dropdown.id], icon: e.target.value } }))
                         }
                         placeholder="Add icon name (e.g., carrot)"
                         className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
                       />
                     )}
-
-                    <Button variant="outline" size="sm" onClick={() => handleAddOption(dropdown.id)} disabled={isSaving}>
+                    <Button variant="outline" size="sm" onClick={() => void handleAddOption(dropdown.id)} disabled={isSaving}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -313,7 +286,7 @@ export default function DropdownManagerPage() {
           setIsDeleteModalOpen(false);
           setDropdownIdToDelete(null);
         }}
-        onConfirm={handleDeleteDropdown}
+        onConfirm={() => void handleDeleteDropdown()}
         itemName="dropdown"
       />
     </div>

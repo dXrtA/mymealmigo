@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from 'lucide-react';
-import { db, onAuthStateChangedClient } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 interface Settings {
@@ -40,7 +40,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith('/admin');
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;

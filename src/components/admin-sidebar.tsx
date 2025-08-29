@@ -4,7 +4,7 @@
 import type React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, FileEdit, Users, Settings, UserCheck, X, Menu, List } from "lucide-react";
+import { LayoutDashboard, FileEdit, Users, Settings, X, Menu, List } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 
 interface SidebarProps {
