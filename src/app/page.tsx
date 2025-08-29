@@ -75,20 +75,20 @@ export default function Home() {
             {!user && (
               <button
                 onClick={() => openModal("free")}
-                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-[#FF6F61] to-[#FF9A8B] hover:opacity-90 md:py-4 md:text-lg md:px-10"
+                className="btn btn-primary btn-lg"
               >
                 Get Started
               </button>
             )}
             <a
               href="#features"
-              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
             >
               Learn More
             </a>
             <button
               onClick={() => setShowProject(true)}
-              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
             >
               About Project
             </button>
