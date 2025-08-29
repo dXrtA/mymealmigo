@@ -434,20 +434,20 @@ export default function ContentEditor() {
               type="text"
               value={hero.title1}
               onChange={(e) => setEditedContent(JSON.stringify({ ...hero, title1: e.target.value }, null, 2))}
-              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#58e221]"
               placeholder="Title Line 1"
             />
             <input
               type="text"
               value={hero.title2}
               onChange={(e) => setEditedContent(JSON.stringify({ ...hero, title2: e.target.value }, null, 2))}
-              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#58e221]"
               placeholder="Title Line 2"
             />
             <textarea
               value={hero.description}
               onChange={(e) => setEditedContent(JSON.stringify({ ...hero, description: e.target.value }, null, 2))}
-              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#58e221]"
               rows={4}
               placeholder="Description"
             />
@@ -459,7 +459,7 @@ export default function ContentEditor() {
                 onChange={(e) =>
                   setEditedContent(JSON.stringify({ ...hero, mediaType: e.target.value as "image" | "video" }, null, 2))
                 }
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#58e221]"
               >
                 <option value="image">Image</option>
                 <option value="video">Video</option>
@@ -567,7 +567,7 @@ export default function ContentEditor() {
                             updated[index] = { ...itemObj, [key]: e.target.value };
                             setEditedContent(JSON.stringify(updated, null, 2));
                           }}
-                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                         />
                       ) : key === "price" ? (
                         <input
@@ -578,7 +578,7 @@ export default function ContentEditor() {
                             updated[index] = { ...itemObj, [key]: Number(e.target.value) };
                             setEditedContent(JSON.stringify(updated, null, 2));
                           }}
-                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                         />
                       ) : key === "features" ? (
                         <textarea
@@ -588,7 +588,7 @@ export default function ContentEditor() {
                             updated[index] = { ...itemObj, [key]: e.target.value.split("\n") };
                             setEditedContent(JSON.stringify(updated, null, 2));
                           }}
-                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                           rows={4}
                         />
                       ) : key === "image" ? (
@@ -664,7 +664,7 @@ export default function ContentEditor() {
                 <select
                   value={sortField}
                   onChange={(e) => setSortField(e.target.value as "rating" | "submittedTime")}
-                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                 >
                   <option value="rating">Rating</option>
                   <option value="submittedTime">Date</option>
@@ -675,7 +675,7 @@ export default function ContentEditor() {
                 <select
                   value={sortDirection}
                   onChange={(e) => setSortDirection(e.target.value as "asc" | "desc")}
-                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                 >
                   {sortField === "rating" ? (
                     <>
@@ -710,7 +710,7 @@ export default function ContentEditor() {
                   min={0}
                   value={maxTestimonials}
                   onChange={(e) => setMaxTestimonials(Number(e.target.value))}
-                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#FF6F61]"
+                  className="w-[180px] p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[##58e221]"
                 />
               </div>
               <div className="flex items-center">
@@ -719,7 +719,7 @@ export default function ContentEditor() {
                     type="checkbox"
                     checked={showOnlyWithText}
                     onChange={(e) => setShowOnlyWithText(e.target.checked)}
-                    className="h-4 w-4 text-[#FF6F61] border-gray-300 rounded focus:ring-[#FF6F61]"
+                    className="h-4 w-4 text-[##58e221] border-gray-300 rounded focus:ring-[##58e221]"
                   />
                   <span>Show only testimonials with text</span>
                 </label>
@@ -806,19 +806,19 @@ export default function ContentEditor() {
               mediaType={hero.mediaType || "image"}
             >
               <button
-                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-[#FF6F61] to-[#FF9A8B] hover:opacity-90 md:py-4 md:text-lg md:px-10"
+                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-[##58e221] to-[#FF9A8B] hover:opacity-90 md:py-4 md:text-lg md:px-10"
                 onClick={() => undefined}
               >
                 Get Started
               </button>
               <a
                 href="#howitworks"
-                className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+                className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[##58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
               >
                 Learn More
               </a>
               <button
-                className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+                className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[##58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
                 onClick={() => undefined}
               >
                 About Project
@@ -842,7 +842,7 @@ export default function ContentEditor() {
   if (authLoading || (!content && appRatings.length === 0)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="h-8 w-8 animate-spin text-[#FF6F61]" />
+        <RefreshCw className="h-8 w-8 animate-spin text-[##58e221]" />
         <span className="ml-2">Loading...</span>
       </div>
     );
@@ -870,7 +870,7 @@ export default function ContentEditor() {
                 key={section}
                 onClick={() => handleEditSection(section)}
                 className={`flex justify-between items-center p-3 rounded-md cursor-pointer ${
-                  activeSection === section ? "bg-[#FF6F61]/10" : "hover:bg-gray-50"
+                  activeSection === section ? "bg-[##58e221]/10" : "hover:bg-gray-50"
                 }`}
               >
                 <span>{section.charAt(0).toUpperCase() + section.slice(1)}</span>
