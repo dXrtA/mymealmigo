@@ -1,109 +1,117 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Features } from "@/components/features";
+import { Pricing } from "@/components/pricing";
+import { Testimonials } from "@/components/testimonials";
+import { HowItWorks } from "@/components/how-it-works";
 import { SignUpModal } from "@/components/sign-up-modal";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import BmiCalculator from "@/components/bmiCalculator";
-import BmrCalculator from "@/components/bmrCalculator";
+import UpgradeToPremiumModal from "@/components/UpgradeToPremiumModal";
+import { ProjectWebsite } from "@/components/ProjectWebsite";
+import { useContent } from "@/context/ContentProvider";
+import { Hero } from "@/components/hero";
+import { useAuth } from "@/context/AuthContext";
 
-type ProfileCore = {
-  heightCm?: number | null;
-  weightKg?: number | null;
-  birthday?: string | null; // ISO string
-  sex?: "male" | "female" | "other" | null;
-};
 
-type UserDoc = {
-  profile?: ProfileCore | null;
-};
+export default function Home() {
+  const router = useRouter();
+  const [showProject, setShowProject] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
-export default function CalculatorsPage() {
-  const { user, loading } = useAuth();
-  const [showSignup, setShowSignup] = useState(false);
-  const [profileDoc, setProfileDoc] = useState<UserDoc | null>(null);
-  const [pLoading, setPLoading] = useState(false);
+  // ⬇️ Only free | premium (nutritionist removed)
+  const [selectedRole, setSelectedRole] = useState<"free" | "premium" | null>(null);
 
-  useEffect(() => {
-    const run = async () => {
-      if (!user) {
-        setProfileDoc(null);
-        return;
+  const { hero, features, howItWorks, pricing, testimonials, isLoading } = useContent();
+  const { user } = useAuth();
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  const mappedFeatures = features;
+
+  // ⬇️ Smart handler:
+  // - Logged OUT: open SignUpModal (free default or premium if pressed in Pricing)
+  // - Logged IN:
+  //    - premium CTA -> open UpgradeToPremiumModal
+  //    - any other CTA (e.g., "Get Started") -> go to /account
+  const openModal = (role?: "free" | "premium") => {
+    if (user) {
+      if (role === "premium") {
+        setShowUpgrade(true);
+      } else {
+        router.push("/account");
       }
-      setPLoading(true);
-      try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        const data = (snap.exists() ? (snap.data() as UserDoc) : {}) || {};
-        setProfileDoc(data);
-      } finally {
-        setPLoading(false);
-      }
-    };
-    void run();
-  }, [user]);
-
-  const initial = useMemo(() => {
-    const p = (profileDoc?.profile ?? {}) as ProfileCore;
-
-    // derive age from birthday if present
-    let age: number | null = null;
-    if (p.birthday) {
-      const b = new Date(p.birthday);
-      if (!Number.isNaN(b.getTime())) {
-        const today = new Date();
-        age = today.getFullYear() - b.getFullYear();
-        const m = today.getMonth() - b.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
-      }
+      return;
     }
+    setSelectedRole(role || null);
+    setShowSignUp(true);
+  };
 
-    return {
-      heightCm: p.heightCm ?? null,
-      weightKg: p.weightKg ?? null,
-      age,
-      sex: p.sex ?? null,
-    };
-  }, [profileDoc]);
-
-  if (loading || pLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-lg rounded-xl border bg-white p-6 text-center">
-          <h1 className="mb-2 text-2xl font-bold">BMI / BMR Calculators</h1>
-          <p className="mb-4 text-gray-600">
-            Create a free account to access the calculators and personalize your results.
-          </p>
-          <button
-            onClick={() => setShowSignup(true)}
-            className="rounded-md bg-[#58e221] px-4 py-2 text-white hover:opacity-90"
-          >
-            Create Free Account
-          </button>
-          <SignUpModal isOpen={showSignup} onClose={() => setShowSignup(false)} />
-        </div>
-      </div>
-    );
-  }
+  const closeModal = () => {
+    setShowSignUp(false);
+    setSelectedRole(null);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <BmiCalculator
-          initialHeightCm={initial.heightCm}
-          initialWeightKg={initial.weightKg}
-        />
-        <BmrCalculator
-          initialAge={initial.age}
-          initialHeightCm={initial.heightCm}
-          initialWeightKg={initial.weightKg}
-          initialSex={initial.sex}
-        />
-      </div>
+    <div className="font-sans antialiased text-gray-800 bg-white">
+      {showProject ? (
+        <div className="w-full h-full fade-in">
+          <ProjectWebsite onClose={() => setShowProject(false)} />
+        </div>
+      ) : (
+        <>
+          <Hero
+            title1={hero.title1 || "Your Health"}
+            title2={hero.title2 || "Made Simple"}
+            description={hero.description || "Track your diet and health with ease."}
+            videoURL={hero.videoURL}
+            imageURL={hero.imageURL}
+            mediaType={hero.mediaType || "image"}
+          >
+            {/* Do NOT show Download here per your preference */}
+            {!user && (
+              <button
+                onClick={() => openModal("free")}
+                className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-[#FF6F61] to-[#FF9A8B] hover:opacity-90 md:py-4 md:text-lg md:px-10"
+              >
+                Get Started
+              </button>
+            )}
+            <a
+              href="#features"
+              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+            >
+              Learn More
+            </a>
+            <button
+              onClick={() => setShowProject(true)}
+              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#FF6F61] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
+            >
+              About Project
+            </button>
+          </Hero>
+
+          <Features features={mappedFeatures} />
+          {/* Pricing will call onOpenModal('premium') for premium CTAs */}
+          <Pricing plans={pricing} onOpenModal={openModal} />
+          <Testimonials testimonials={testimonials} />
+          <HowItWorks steps={howItWorks} />
+
+          {/* Modals */}
+          <SignUpModal
+            isOpen={showSignUp}
+            onClose={closeModal}
+            initialRole={selectedRole || undefined} // safe; 'nutritionist' removed everywhere here
+          />
+          <UpgradeToPremiumModal
+            isOpen={showUpgrade}
+            onClose={() => setShowUpgrade(false)}
+          />
+        </>
+      )}
     </div>
   );
 }
