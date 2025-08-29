@@ -12,11 +12,11 @@ type Plan = {
 };
 
 type PricingProps = {
-  plans: Plan[] | any; // tolerate odd shapes from CMS
+  plans: unknown; // tolerate odd shapes from CMS
   onOpenModal: (role?: "free" | "premium") => void;
 };
 
-const toArray = <T,>(v: any): T[] =>
+const toArray = <T,>(v: unknown): T[] =>
   Array.isArray(v) ? v : (v && typeof v === "object" ? (Object.values(v) as T[]) : []);
 
 export function Pricing({ plans, onOpenModal }: PricingProps) {

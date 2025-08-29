@@ -7,20 +7,24 @@ type Props = {
   initialWeightKg?: number | null;
 };
 
-export default function BmiCalculator({ initialHeightCm, initialWeightKg }: Props) {
+export default function BmiCalculator({ initialHeightCm = null, initialWeightKg = null }: Props) {
   const [heightCm, setHeightCm] = useState<number | "">("");
   const [weightKg, setWeightKg] = useState<number | "">("");
 
+  // Prefill once per field when an initial value exists and the input is still empty
   useEffect(() => {
     if (initialHeightCm != null && heightCm === "") setHeightCm(initialHeightCm);
+  }, [initialHeightCm, heightCm]);
+
+  useEffect(() => {
     if (initialWeightKg != null && weightKg === "") setWeightKg(initialWeightKg);
-  }, [initialHeightCm, initialWeightKg]); // prefill once
+  }, [initialWeightKg, weightKg]);
 
   const bmi = useMemo(() => {
-    if (!heightCm || !weightKg) return null;
-    const m = Number(heightCm) / 100;
-    const val = Number(weightKg) / (m * m);
-    return Number.isFinite(val) ? Number(val.toFixed(1)) : null;
+    if (heightCm === "" || weightKg === "" || heightCm <= 0) return null;
+    const meters = Number(heightCm) / 100;
+    const val = Number(weightKg) / (meters * meters);
+    return Number.isFinite(val) ? Math.round(val * 10) / 10 : null; // 1 decimal
   }, [heightCm, weightKg]);
 
   const bmiCat = useMemo(() => {
@@ -31,39 +35,49 @@ export default function BmiCalculator({ initialHeightCm, initialWeightKg }: Prop
     return "Obese";
   }, [bmi]);
 
+  const parseNumberInput = (e: React.ChangeEvent<HTMLInputElement>) =>
+    e.target.value === "" ? "" : Number.isNaN(e.target.valueAsNumber) ? "" : e.target.valueAsNumber;
+
   return (
     <div className="rounded-xl border bg-white p-6">
-      <h3 className="text-lg font-semibold mb-3">BMI Calculator</h3>
+      <h3 className="mb-3 text-lg font-semibold">BMI Calculator</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block">
           <span className="text-sm text-gray-700">Height (cm)</span>
           <input
-            type="number" min={0} step="0.1"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.1"
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={heightCm}
-            onChange={(e) => setHeightCm(e.target.value ? Number(e.target.value) : "")}
+            onChange={(e) => setHeightCm(parseNumberInput(e))}
           />
         </label>
+
         <label className="block">
           <span className="text-sm text-gray-700">Weight (kg)</span>
           <input
-            type="number" min={0} step="0.1"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.1"
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={weightKg}
-            onChange={(e) => setWeightKg(e.target.value ? Number(e.target.value) : "")}
+            onChange={(e) => setWeightKg(parseNumberInput(e))}
           />
         </label>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
         <div className="rounded-lg border p-3">
           <div className="text-sm text-gray-500">BMI</div>
           <div className="text-2xl font-bold">{bmi ?? "—"}</div>
         </div>
         <div className="rounded-lg border p-3 md:col-span-2">
           <div className="text-sm text-gray-500">Category</div>
-          <div className="text-base">{bmi ? bmiCat : "—"}</div>
+          <div className="text-base">{bmi != null ? bmiCat : "—"}</div>
         </div>
       </div>
     </div>

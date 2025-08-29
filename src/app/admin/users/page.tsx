@@ -36,8 +36,17 @@ type RowUser = {
 const isTimestamp = (v: unknown): v is Timestamp =>
   typeof v === "object" && v !== null && v instanceof Timestamp;
 
-const errHasCode = (e: unknown): e is { code: string; message?: string } =>
-  typeof e === "object" && e !== null && "code" in e && typeof (e as any).code === "string";
+const hasCode = (e: unknown): e is { code: string } =>
+  typeof e === "object" &&
+  e !== null &&
+  "code" in e &&
+  typeof (e as Record<string, unknown>).code === "string";
+
+const hasMessage = (e: unknown): e is { message: string } =>
+  typeof e === "object" &&
+  e !== null &&
+  "message" in e &&
+  typeof (e as Record<string, unknown>).message === "string";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<RowUser[]>([]);
@@ -66,7 +75,7 @@ export default function AdminUsersPage() {
         } else if (typeof createdAt === "string") {
           joinedISO = new Date(createdAt).toISOString();
         } else if (data?.joined) {
-          joinedISO = new Date(data.joined).toISOString();
+          joinedISO = new Date(data.joined as string).toISOString();
         }
 
         // role
@@ -81,10 +90,13 @@ export default function AdminUsersPage() {
         // subscription
         const subscription = {
           plan: subPlan,
-          active: typeof data?.subscription?.active === "boolean" ? data.subscription.active : subPlan === "premium",
+          active:
+            typeof data?.subscription?.active === "boolean"
+              ? (data.subscription.active as boolean)
+              : subPlan === "premium",
           billing:
             data?.subscription?.billing === "monthly" || data?.subscription?.billing === "yearly"
-              ? data.subscription.billing
+              ? (data.subscription.billing as "monthly" | "yearly")
               : null,
         };
 
@@ -104,11 +116,11 @@ export default function AdminUsersPage() {
     } catch (e: unknown) {
       console.error("Users load error:", e);
       setErr(
-        errHasCode(e) && e.code === "permission-denied"
+        hasCode(e) && e.code === "permission-denied"
           ? "Permission denied loading users. Check Firestore rules for admin reads."
-          : (typeof e === "object" && e && "message" in e && typeof (e as any).message === "string"
-              ? (e as any).message
-              : "Failed to load users.")
+          : hasMessage(e)
+          ? e.message
+          : "Failed to load users."
       );
     } finally {
       setLoading(false);
@@ -135,9 +147,14 @@ export default function AdminUsersPage() {
   const visible = filtered.slice(start, start + perPage);
 
   const toggleSuspend = async (u: RowUser) => {
-    const newStatus: AccountStatus = u.accountStatus === "Active" ? "Suspended" : "Active";
-    await updateDoc(doc(db, "users", u.id), { accountStatus: newStatus });
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, accountStatus: newStatus } : x)));
+    try {
+      const newStatus: AccountStatus = u.accountStatus === "Active" ? "Suspended" : "Active";
+      await updateDoc(doc(db, "users", u.id), { accountStatus: newStatus });
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, accountStatus: newStatus } : x)));
+    } catch (e: unknown) {
+      console.error("Suspend toggle failed:", e);
+      setErr(hasMessage(e) ? e.message : "Failed to update status.");
+    }
   };
 
   const canPrev = page > 1;

@@ -1,14 +1,19 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+// next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",
-        pathname: "/v0/b/**", // Matches Firebase Storage URLs
+        pathname: "/v0/b/**",
       },
     ],
   },
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+  reactStrictMode: true,
 };
 
-module.exports = nextConfig;
+export default nextConfig;

@@ -419,9 +419,6 @@ export default function ContentEditor() {
     }
   };
 
-  const handleOpenModal = (_role?: "free" | "premium") => {
-    // Preview only (no-op). Real flow handled on the main page.
-  };
 
   const renderVisualEditor = () => {
     if (!activeSection) return <p>Select a section to edit</p>;
