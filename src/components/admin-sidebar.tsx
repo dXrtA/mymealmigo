@@ -20,7 +20,6 @@ export default function Sidebar({ isSidebarOpen, setIsSidebarOpen, isMobile }: S
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Content Editor", href: "/admin/cms", icon: FileEdit },
     { name: "Users", href: "/admin/users", icon: Users },
-    { name: "Dropdown Manager", href: "/admin/dropdown-manager", icon: List },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
