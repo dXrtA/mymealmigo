@@ -26,17 +26,20 @@ export default function CalculatorsPage() {
   const [profileDoc, setProfileDoc] = useState<UserDoc | null>(null);
   const [showSignup, setShowSignup] = useState(false);
 
+  // Only fetch profile when signed-in (for prefill). Guests skip this.
   useEffect(() => {
     let cancel = false;
     (async () => {
-      if (!user) return;
+      if (!user) {
+        setProfileDoc(null);
+        return;
+      }
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         if (!cancel) {
           setProfileDoc((snap.exists() ? (snap.data() as UserDoc) : {}) || {});
         }
       } catch (e) {
-        // non-fatal for calculators; just log
         console.error("Failed to load profile:", e);
         if (!cancel) setProfileDoc({});
       }
@@ -46,10 +49,11 @@ export default function CalculatorsPage() {
     };
   }, [user?.uid, user]);
 
+  // Prefill data if available; otherwise leave empty (guest).
   const initial = useMemo(() => {
     const p = (profileDoc?.profile ?? {}) as UserProfile;
 
-    // derive age from birthday if present + valid
+    // derive age from birthday if present & valid
     let age: number | null = null;
     if (p.birthday) {
       const b = new Date(p.birthday);
@@ -73,30 +77,29 @@ export default function CalculatorsPage() {
     return <div className="min-h-screen flex items-center justify-center">Loading…</div>;
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-lg w-full rounded-xl border bg-white p-6 text-center">
-          <h1 className="text-2xl font-bold mb-2">BMI / BMR Calculators</h1>
-          <p className="text-gray-600 mb-4">
-            Create a free account to access the calculators and personalize your results.
-          </p>
-          <button
-            onClick={() => setShowSignup(true)}
-            className="rounded-md bg-[#58e221] text-white px-4 py-2 hover:opacity-90"
-          >
-            Create Free Account
-          </button>
-          <SignUpModal isOpen={showSignup} onClose={() => setShowSignup(false)} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
+      {!user && (
+        <div className="mx-auto mb-6 max-w-3xl rounded-md border bg-white p-4 text-sm text-gray-700">
+          You’re using the calculators as a guest. Results are computed locally and not saved.
+          <button
+            onClick={() => setShowSignup(true)}
+            className="ml-2 rounded-md bg-[#58e221] px-2 py-1 text-white hover:opacity-90"
+          >
+            Create a free account
+          </button>{" "}
+          or <a className="underline" href="/login">log in</a> to prefill and save defaults.
+        </div>
+      )}
+
+      {/* Modal lives here so guests can open it */}
+      <SignUpModal isOpen={showSignup} onClose={() => setShowSignup(false)} />
+
       <div className="max-w-3xl mx-auto space-y-6">
-        <BmiCalculator initialHeightCm={initial.heightCm} initialWeightKg={initial.weightKg} />
+        <BmiCalculator
+          initialHeightCm={initial.heightCm}
+          initialWeightKg={initial.weightKg}
+        />
         <BmrCalculator
           initialAge={initial.age}
           initialHeightCm={initial.heightCm}
