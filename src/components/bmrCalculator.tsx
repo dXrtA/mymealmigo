@@ -77,6 +77,10 @@ export default function BmrCalculator({
   return (
     <div className="rounded-xl border bg-white p-6">
       <h3 className="mb-3 text-lg font-semibold">BMR &amp; TDEE Calculator</h3>
+      <p className ="text-sm text-gray-600">
+        <span className ="font-medium">BMR</span> is the calories your body needs at rest (baseline).
+        <span className ="font-medium">TDEE</span> = BMR x activity factor - estimates daily calories to maintain weight.
+      </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <label className="block">

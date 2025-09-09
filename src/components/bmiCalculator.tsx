@@ -41,6 +41,10 @@ export default function BmiCalculator({ initialHeightCm = null, initialWeightKg 
   return (
     <div className="rounded-xl border bg-white p-6">
       <h3 className="mb-3 text-lg font-semibold">BMI Calculator</h3>
+      <p className ="text-sm text-gray-600 mb-3">
+        BMI estimates body fat from height and weight. It's a screening tool (not a diagnosis) and
+        doesn't account for muscle mass. General ranges: 18.5-24.9 normal, 25-29.9 overweight, 30+ obese.
+      </p>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <label className="block">
