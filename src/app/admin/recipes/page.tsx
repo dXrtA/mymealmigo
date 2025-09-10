@@ -199,42 +199,55 @@ export default function AdminRecipesPage() {
     }
   };
 
-  const uploadImage = async (file: File) => {
-    if (!file) return;
-    if (!selectedId) {
-      alert("Save the recipe first, then upload an image.");
-      return;
-    }
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-      alert("Only PNG, JPG or WebP images are allowed.");
-      return;
-    }
-    if (file.size > 6 * 1024 * 1024) {
-      alert("Please upload images under 6MB.");
-      return;
-    }
-    setUploading(true);
-    try {
-      // keep path under websiteImages/… to match your existing pattern
-      const path = `websiteImages/recipes/${selectedId}_${Date.now()}`;
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = (await getDownloadURL(storageRef)).trimEnd();
+    const uploadImage = async (file: File) => {
+        if (!file) return;
+        if (!selectedId) {
+            alert("Save the recipe first, then upload an image.");
+            return;
+        }
 
-      await updateDoc(doc(db, "recipes", selectedId), {
-        imageURL: url,
-        imageStoragePath: path,
-        updatedAt: serverTimestamp(),
-      });
+        // must match Storage rules
+        const allowed = ["image/png", "image/jpeg", "image/webp"];
+        if (!allowed.includes(file.type)) {
+            alert("Only PNG, JPG or WebP images are allowed.");
+            return;
+        }
+        // keep this <= the limit in your rules (5MB in the example rules)
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Please upload images under 5MB.");
+            return;
+        }
 
-      setForm((f) => ({ ...f, imageURL: url, imageStoragePath: path }));
-    } catch (e) {
-      console.error("upload image error:", e);
-      alert("Image upload failed. Check Storage rules.");
-    } finally {
-      setUploading(false);
-    }
-  };
+        setUploading(true);
+        try {
+            // use a recipe-specific folder (optional but tidy)
+            // if your rules allow websiteImages/** you can keep that;
+            // path just needs to match your rules.
+            const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+            const path = `recipeImages/${selectedId}/${Date.now()}.${ext}`; // or keep websiteImages/recipes/...
+
+            const storageRef = ref(storage, path);
+
+            // ✅ pass contentType so rules can validate it
+            await uploadBytes(storageRef, file, { contentType: file.type || "image/jpeg" });
+
+            const url = (await getDownloadURL(storageRef)).trimEnd();
+
+            await updateDoc(doc(db, "recipes", selectedId), {
+            imageURL: url,
+            imageStoragePath: path,
+            updatedAt: serverTimestamp(),
+            });
+
+            setForm((f) => ({ ...f, imageURL: url, imageStoragePath: path }));
+        } catch (e) {
+            console.error("upload image error:", e);
+            alert("Image upload failed. Check Storage rules.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
 
   const removeImage = async () => {
     if (!selectedId || !form.imageStoragePath) return;
