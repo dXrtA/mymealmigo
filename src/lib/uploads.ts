@@ -11,7 +11,7 @@ export async function uploadRecipeImage(recipeId: string, file: File) {
   const path = `recipeImages/${recipeId}/${Date.now()}.${ext || "jpg"}`;
   const storageRef = ref(storage, path);
 
-  await uploadBytes(storageRef, file, { contentType });
+  await uploadBytes(storageRef, file, { contentType: file.type });
   const url = await getDownloadURL(storageRef);
   return { url, storagePath: path };
 }

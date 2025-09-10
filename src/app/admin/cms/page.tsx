@@ -261,7 +261,7 @@ export default function ContentEditor() {
     try {
       const storageRef = ref(storage, path);
       // ✅ pass metadata with contentType
-      await uploadBytes(storageRef, file, { contentType });
+      await uploadBytes(storageRef, file, { contentType:file.type });
       const url = (await getDownloadURL(storageRef)).trimEnd();
 
       if (section === "hero") {

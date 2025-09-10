@@ -245,7 +245,7 @@ export default function AdminRecipesPage() {
       const storageRef = ref(storage, path);
 
       // ✅ pass metadata so Storage rules see the MIME type
-      await uploadBytes(storageRef, file, { contentType });
+      await uploadBytes(storageRef, file, { contentType: file.type });
 
       const url = (await getDownloadURL(storageRef)).trimEnd();
 
