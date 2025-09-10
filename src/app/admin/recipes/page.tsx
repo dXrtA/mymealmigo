@@ -182,9 +182,9 @@ export default function AdminRecipesPage() {
         setMsg("Recipe saved.");
       }
       setTimeout(() => setMsg(null), 2000);
-    } catch (e) {
+    } catch (e: any) {
       console.error("save recipe:", e);
-      setMsg("Error saving recipe. Check rules & fields.");
+      setMsg(`Error saving recipe: ${e?.code ?? e?.message ?? "Unknown error"}`);
     } finally {
       setSaving(false);
     }
@@ -210,7 +210,7 @@ export default function AdminRecipesPage() {
     }
   };
 
-  // === CMS-like upload behavior: PNG/JPEG, 5MB, websiteImages/... ===
+  // === Upload with MIME metadata (PNG/JPEG/WEBP), 5MB, websiteImages/... ===
   const uploadRecipeImage = async (file: File) => {
     if (!file) return;
     if (!selectedId) {
@@ -218,14 +218,23 @@ export default function AdminRecipesPage() {
       return;
     }
 
-    const allowedImageTypes = ["image/png", "image/jpeg"];
-    const maxImageSize = 5 * 1024 * 1024; // 5MB
+    // Allow same types as your Storage rules
+    const allowed = ["image/png", "image/jpeg", "image/webp"] as const;
+    const maxSize = 5 * 1024 * 1024; // 5MB
 
-    if (!allowedImageTypes.includes(file.type)) {
-      setMsg("Error: Only PNG or JPEG files are allowed.");
+    // Determine/validate contentType
+    let contentType = file.type;
+    if (!contentType) {
+      const name = file.name.toLowerCase();
+      if (name.endsWith(".png")) contentType = "image/png";
+      else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) contentType = "image/jpeg";
+      else if (name.endsWith(".webp")) contentType = "image/webp";
+    }
+    if (!contentType || !allowed.includes(contentType as any)) {
+      setMsg("Error: Only PNG, JPEG, or WEBP files are allowed.");
       return;
     }
-    if (file.size > maxImageSize) {
+    if (file.size > maxSize) {
       setMsg("Error: File must be smaller than 5MB.");
       return;
     }
@@ -235,8 +244,8 @@ export default function AdminRecipesPage() {
       const path = `websiteImages/recipes/${selectedId}_${Date.now()}`;
       const storageRef = ref(storage, path);
 
-      // No metadata (to match CMS)
-      await uploadBytes(storageRef, file);
+      // ✅ pass metadata so Storage rules see the MIME type
+      await uploadBytes(storageRef, file, { contentType });
 
       const url = (await getDownloadURL(storageRef)).trimEnd();
 
@@ -248,9 +257,9 @@ export default function AdminRecipesPage() {
 
       setForm((f) => ({ ...f, imageURL: url, imageStoragePath: path }));
       setMsg("Image uploaded!");
-    } catch (e) {
+    } catch (e: any) {
       console.error("Image upload failed:", e);
-      setMsg("Error: Image upload failed. Check Storage rules.");
+      setMsg(`Error: ${e?.code ?? e?.message ?? "Image upload failed. Check Storage rules."}`);
     } finally {
       setUploading(false);
       setTimeout(() => setMsg(null), 2200);
@@ -274,9 +283,9 @@ export default function AdminRecipesPage() {
 
       setForm((f) => ({ ...f, imageURL: "", imageStoragePath: "" }));
       setMsg("Image removed.");
-    } catch (e) {
+    } catch (e: any) {
       console.error("Media removal failed:", e);
-      setMsg("Error: Failed to remove image.");
+      setMsg(`Error: ${e?.code ?? e?.message ?? "Failed to remove image."}`);
     } finally {
       setTimeout(() => setMsg(null), 2200);
     }
@@ -436,7 +445,7 @@ export default function AdminRecipesPage() {
                     {uploading ? "Uploading…" : "Upload"}
                     <input
                       type="file"
-                      accept="image/png,image/jpeg"
+                      accept="image/png,image/jpeg,image/webp"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
