@@ -2,17 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc,
-  onSnapshot, orderBy, query, serverTimestamp, Timestamp, type DocumentData, type WithFieldValue,
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  type DocumentData,
+  type WithFieldValue,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { ProtectedRoute } from "@/context/ProtectedRoute";
 import { Plus, Save, Trash2, Upload, RefreshCw, Search, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
-import type { FieldValue } from "firebase/firestore"; 
+import type { FieldValue } from "firebase/firestore";
 
 type Ingredient = { name: string; amount?: string };
+
 type RecipeDoc = {
   title: string;
   description?: string;
@@ -22,8 +33,8 @@ type RecipeDoc = {
   imageURL?: string;
   imageStoragePath?: string;
   isPublic?: boolean;
-  createdAt?: Timestamp | FieldValue; 
-  updatedAt?: Timestamp | FieldValue; 
+  createdAt?: Timestamp | FieldValue;
+  updatedAt?: Timestamp | FieldValue;
 };
 
 type RecipeRow = {
@@ -63,22 +74,25 @@ export default function AdminRecipesPage() {
   // live list
   useEffect(() => {
     const col = collection(db, "recipes");
-    const unsub = onSnapshot(query(col, orderBy("updatedAt", "desc")), (qs) => {
-      const rows = qs.docs.map((d) => mapDoc(d.id, d.data()));
-      setRecipes(rows);
-    }, (err) => {
-      console.error("recipes onSnapshot error:", err);
-      setRecipes([]);
-    });
+    const unsub = onSnapshot(
+      query(col, orderBy("updatedAt", "desc")),
+      (qs) => {
+        const rows = qs.docs.map((d) => mapDoc(d.id, d.data()));
+        setRecipes(rows);
+      },
+      (err) => {
+        console.error("recipes onSnapshot error:", err);
+        setRecipes([]);
+      }
+    );
     return () => unsub();
   }, []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return recipes;
-    return recipes.filter(r =>
-      r.title.toLowerCase().includes(s) ||
-      r.tags.join(" ").toLowerCase().includes(s)
+    return recipes.filter(
+      (r) => r.title.toLowerCase().includes(s) || r.tags.join(" ").toLowerCase().includes(s)
     );
   }, [q, recipes]);
 
@@ -130,63 +144,60 @@ export default function AdminRecipesPage() {
     setSaving(true);
     setMsg(null);
     try {
-        if (!selectedId) {
-        // CREATE: include createdAt + updatedAt
+      if (!selectedId) {
+        // CREATE
         const payload: WithFieldValue<RecipeDoc> = {
-            title: form.title.trim(),
-            description: form.description?.trim() || "",
-            tags: (form.tags || []).map(t => t.trim()).filter(Boolean),
-            ingredients: (form.ingredients || [])
-            .map(i => ({ name: i.name?.trim() || "", amount: i.amount?.trim() || "" }))
-            .filter(i => i.name),
-            steps: (form.steps || []).map(s => s.trim()).filter(Boolean),
-            imageURL: form.imageURL || "",
-            imageStoragePath: form.imageStoragePath || "",
-            isPublic: !!form.isPublic,
-            createdAt: serverTimestamp(),         // ← FieldValue OK
-            updatedAt: serverTimestamp(),         // ← FieldValue OK
+          title: form.title.trim(),
+          description: form.description?.trim() || "",
+          tags: (form.tags || []).map((t) => t.trim()).filter(Boolean),
+          ingredients: (form.ingredients || [])
+            .map((i) => ({ name: i.name?.trim() || "", amount: i.amount?.trim() || "" }))
+            .filter((i) => i.name),
+          steps: (form.steps || []).map((s) => s.trim()).filter(Boolean),
+          imageURL: form.imageURL || "",
+          imageStoragePath: form.imageStoragePath || "",
+          isPublic: !!form.isPublic,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
         const refDoc = await addDoc(collection(db, "recipes"), payload);
         setSelectedId(refDoc.id);
         setMsg("Recipe created.");
-        } else {
-        // UPDATE: only updatedAt
+      } else {
+        // UPDATE
         const payload: WithFieldValue<RecipeDoc> = {
-            title: form.title.trim(),
-            description: form.description?.trim() || "",
-            tags: (form.tags || []).map(t => t.trim()).filter(Boolean),
-            ingredients: (form.ingredients || [])
-            .map(i => ({ name: i.name?.trim() || "", amount: i.amount?.trim() || "" }))
-            .filter(i => i.name),
-            steps: (form.steps || []).map(s => s.trim()).filter(Boolean),
-            imageURL: form.imageURL || "",
-            imageStoragePath: form.imageStoragePath || "",
-            isPublic: !!form.isPublic,
-            updatedAt: serverTimestamp(),         // ← FieldValue OK
+          title: form.title.trim(),
+          description: form.description?.trim() || "",
+          tags: (form.tags || []).map((t) => t.trim()).filter(Boolean),
+          ingredients: (form.ingredients || [])
+            .map((i) => ({ name: i.name?.trim() || "", amount: i.amount?.trim() || "" }))
+            .filter((i) => i.name),
+          steps: (form.steps || []).map((s) => s.trim()).filter(Boolean),
+          imageURL: form.imageURL || "",
+          imageStoragePath: form.imageStoragePath || "",
+          isPublic: !!form.isPublic,
+          updatedAt: serverTimestamp(),
         };
         await updateDoc(doc(db, "recipes", selectedId), payload);
         setMsg("Recipe saved.");
-        }
-        setTimeout(() => setMsg(null), 2000);
+      }
+      setTimeout(() => setMsg(null), 2000);
     } catch (e) {
-        console.error("save recipe:", e);
-        setMsg("Error saving recipe. Check rules & fields.");
+      console.error("save recipe:", e);
+      setMsg("Error saving recipe. Check rules & fields.");
     } finally {
-        setSaving(false);
+      setSaving(false);
     }
-    };
-
+  };
 
   const remove = async () => {
     if (!selectedId) return;
     if (!confirm("Delete this recipe?")) return;
     try {
-      // delete image if present
       if (form.imageStoragePath) {
         try {
           await deleteObject(ref(storage, form.imageStoragePath));
         } catch (e) {
-          // ignore storage errors to not block doc delete
           console.warn("image delete failed:", e);
         }
       }
@@ -199,69 +210,75 @@ export default function AdminRecipesPage() {
     }
   };
 
-    const uploadImage = async (file: File) => {
-        if (!file) return;
-        if (!selectedId) {
-            alert("Save the recipe first, then upload an image.");
-            return;
-        }
+  // === CMS-like upload behavior: PNG/JPEG, 5MB, websiteImages/... ===
+  const uploadRecipeImage = async (file: File) => {
+    if (!file) return;
+    if (!selectedId) {
+      setMsg("Save the recipe first, then upload an image.");
+      return;
+    }
 
-        // must match Storage rules
-        const allowed = ["image/png", "image/jpeg", "image/webp"];
-        if (!allowed.includes(file.type)) {
-            alert("Only PNG, JPG or WebP images are allowed.");
-            return;
-        }
-        // keep this <= the limit in your rules (5MB in the example rules)
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Please upload images under 5MB.");
-            return;
-        }
+    const allowedImageTypes = ["image/png", "image/jpeg"];
+    const maxImageSize = 5 * 1024 * 1024; // 5MB
 
-        setUploading(true);
-        try {
-            // use a recipe-specific folder (optional but tidy)
-            // if your rules allow websiteImages/** you can keep that;
-            // path just needs to match your rules.
-            const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-            const path = `recipeImages/${selectedId}/${Date.now()}.${ext}`; // or keep websiteImages/recipes/...
+    if (!allowedImageTypes.includes(file.type)) {
+      setMsg("Error: Only PNG or JPEG files are allowed.");
+      return;
+    }
+    if (file.size > maxImageSize) {
+      setMsg("Error: File must be smaller than 5MB.");
+      return;
+    }
 
-            const storageRef = ref(storage, path);
+    setUploading(true);
+    try {
+      const path = `websiteImages/recipes/${selectedId}_${Date.now()}`;
+      const storageRef = ref(storage, path);
 
-            // ✅ pass contentType so rules can validate it
-            await uploadBytes(storageRef, file, { contentType: file.type || "image/jpeg" });
+      // No metadata (to match CMS)
+      await uploadBytes(storageRef, file);
 
-            const url = (await getDownloadURL(storageRef)).trimEnd();
+      const url = (await getDownloadURL(storageRef)).trimEnd();
 
-            await updateDoc(doc(db, "recipes", selectedId), {
-            imageURL: url,
-            imageStoragePath: path,
-            updatedAt: serverTimestamp(),
-            });
+      await updateDoc(doc(db, "recipes", selectedId), {
+        imageURL: url,
+        imageStoragePath: path,
+        updatedAt: serverTimestamp(),
+      });
 
-            setForm((f) => ({ ...f, imageURL: url, imageStoragePath: path }));
-        } catch (e) {
-            console.error("upload image error:", e);
-            alert("Image upload failed. Check Storage rules.");
-        } finally {
-            setUploading(false);
-        }
-    };
+      setForm((f) => ({ ...f, imageURL: url, imageStoragePath: path }));
+      setMsg("Image uploaded!");
+    } catch (e) {
+      console.error("Image upload failed:", e);
+      setMsg("Error: Image upload failed. Check Storage rules.");
+    } finally {
+      setUploading(false);
+      setTimeout(() => setMsg(null), 2200);
+    }
+  };
 
-
-  const removeImage = async () => {
+  const removeRecipeImage = async () => {
     if (!selectedId || !form.imageStoragePath) return;
     try {
+      if (!form.imageStoragePath.startsWith("websiteImages/")) {
+        throw new Error("Invalid storage path");
+      }
+
       await deleteObject(ref(storage, form.imageStoragePath));
+
       await updateDoc(doc(db, "recipes", selectedId), {
         imageURL: "",
         imageStoragePath: "",
         updatedAt: serverTimestamp(),
       });
+
       setForm((f) => ({ ...f, imageURL: "", imageStoragePath: "" }));
+      setMsg("Image removed.");
     } catch (e) {
-      console.error("remove image error:", e);
-      alert("Failed to remove image.");
+      console.error("Media removal failed:", e);
+      setMsg("Error: Failed to remove image.");
+    } finally {
+      setTimeout(() => setMsg(null), 2200);
     }
   };
 
@@ -291,9 +308,7 @@ export default function AdminRecipesPage() {
           </div>
         </div>
 
-        {msg && (
-          <div className="rounded-md border bg-white px-3 py-2 text-sm">{msg}</div>
-        )}
+        {msg && <div className="rounded-md border bg-white px-3 py-2 text-sm">{msg}</div>}
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* List */}
@@ -315,7 +330,10 @@ export default function AdminRecipesPage() {
                     <div className="mt-1 text-xs text-gray-500 line-clamp-2">{r.description}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {r.tags.slice(0, 5).map((t) => (
-                        <span key={t} className="rounded bg-gray-100 px-2 py-[2px] text-[11px] text-gray-700">
+                        <span
+                          key={t}
+                          className="rounded bg-gray-100 px-2 py-[2px] text-[11px] text-gray-700"
+                        >
                           #{t}
                         </span>
                       ))}
@@ -418,11 +436,11 @@ export default function AdminRecipesPage() {
                     {uploading ? "Uploading…" : "Upload"}
                     <input
                       type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                      accept="image/png,image/jpeg"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) void uploadImage(file);
+                        if (file) void uploadRecipeImage(file);
                         e.currentTarget.value = "";
                       }}
                       disabled={uploading}
@@ -430,7 +448,7 @@ export default function AdminRecipesPage() {
                   </label>
                   {form.imageURL && (
                     <button
-                      onClick={removeImage}
+                      onClick={removeRecipeImage}
                       className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
                     >
                       Remove
@@ -468,7 +486,10 @@ export default function AdminRecipesPage() {
                 <h3 className="text-sm font-medium">Ingredients</h3>
                 <button
                   onClick={() =>
-                    setForm((f) => ({ ...f, ingredients: [...(f.ingredients || []), { name: "", amount: "" }] }))
+                    setForm((f) => ({
+                      ...f,
+                      ingredients: [...(f.ingredients || []), { name: "", amount: "" }],
+                    }))
                   }
                   className="text-sm text-[#58e221]"
                 >
@@ -503,7 +524,10 @@ export default function AdminRecipesPage() {
                     onClick={() => {
                       const arr = [...(form.ingredients || [])];
                       arr.splice(i, 1);
-                      setForm((f) => ({ ...f, ingredients: arr.length ? arr : [{ name: "", amount: "" }] }));
+                      setForm((f) => ({
+                        ...f,
+                        ingredients: arr.length ? arr : [{ name: "", amount: "" }],
+                      }));
                     }}
                   >
                     Remove
