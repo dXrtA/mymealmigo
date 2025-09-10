@@ -210,7 +210,7 @@ export default function AdminRecipesPage() {
     }
   };
 
-  // === Upload with MIME metadata (PNG/JPEG/WEBP), 5MB, websiteImages/... ===
+  // Upload PNG/JPEG (≤5MB) to websiteImages/... with explicit MIME metadata
   const uploadRecipeImage = async (file: File) => {
     if (!file) return;
     if (!selectedId) {
@@ -218,20 +218,18 @@ export default function AdminRecipesPage() {
       return;
     }
 
-    // Allow same types as your Storage rules
-    const allowed = ["image/png", "image/jpeg", "image/webp"] as const;
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowed = ["image/png", "image/jpeg"] as const; // <-- match Storage rules
+    const maxSize = 5 * 1024 * 1024;
 
-    // Determine/validate contentType
+    // work out contentType (fallback to extension if browser didn't set it)
     let contentType = file.type;
     if (!contentType) {
       const name = file.name.toLowerCase();
       if (name.endsWith(".png")) contentType = "image/png";
       else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) contentType = "image/jpeg";
-      else if (name.endsWith(".webp")) contentType = "image/webp";
     }
     if (!contentType || !allowed.includes(contentType as any)) {
-      setMsg("Error: Only PNG, JPEG, or WEBP files are allowed.");
+      setMsg("Error: Only PNG or JPEG files are allowed.");
       return;
     }
     if (file.size > maxSize) {
@@ -244,8 +242,8 @@ export default function AdminRecipesPage() {
       const path = `websiteImages/recipes/${selectedId}_${Date.now()}`;
       const storageRef = ref(storage, path);
 
-      // ✅ pass metadata so Storage rules see the MIME type
-      await uploadBytes(storageRef, file, { contentType: file.type });
+      // send MIME metadata so rules can validate contentType
+      await uploadBytes(storageRef, file, { contentType });
 
       const url = (await getDownloadURL(storageRef)).trimEnd();
 
@@ -339,10 +337,7 @@ export default function AdminRecipesPage() {
                     <div className="mt-1 text-xs text-gray-500 line-clamp-2">{r.description}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {r.tags.slice(0, 5).map((t) => (
-                        <span
-                          key={t}
-                          className="rounded bg-gray-100 px-2 py-[2px] text-[11px] text-gray-700"
-                        >
+                        <span key={t} className="rounded bg-gray-100 px-2 py-[2px] text-[11px] text-gray-700">
                           #{t}
                         </span>
                       ))}
@@ -445,7 +440,7 @@ export default function AdminRecipesPage() {
                     {uploading ? "Uploading…" : "Upload"}
                     <input
                       type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                      accept="image/png,image/jpeg" 
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];

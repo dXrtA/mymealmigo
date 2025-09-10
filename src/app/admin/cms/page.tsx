@@ -177,8 +177,8 @@ export default function ContentEditor() {
         const ratings: AppRating[] = snap.docs.map((d) => {
           const data = d.data() as DocumentData;
           const submitted =
-            (typeof (data as any).submittedTime?.toDate === "function" && (data as any).submittedTime.toDate().toISOString()) ||
-            (typeof (data as any).submittedTime === "string" && (data as any).submittedTime) ||
+            (typeof data.submittedTime?.toDate === "function" && data.submittedTime.toDate().toISOString()) ||
+            (typeof data.submittedTime === "string" && data.submittedTime) ||
             new Date().toISOString();
           return {
             id: d.id,
@@ -219,7 +219,6 @@ export default function ContentEditor() {
     setPreviewMode(true);
   };
 
-  // 🔧 FIX: always send contentType so Storage rules can validate it
   const handleMediaUpload = async (
     file: File,
     path: string,
@@ -247,21 +246,10 @@ export default function ContentEditor() {
       return null;
     }
 
-    // infer contentType safely (some browsers give empty file.type)
-    const ext = (file.name.split(".").pop() || "").toLowerCase();
-    const guessed =
-      ext === "png" ? "image/png" :
-      ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
-      file.type || (isVideo ? "video/mp4" : "image/jpeg");
-    const contentType = isVideo ? "video/mp4" : guessed;
-
-    console.debug("Uploading media", { path, name: file.name, type: file.type, guessed: contentType, size: file.size });
-
     setUploadingMedia((p) => ({ ...p, [path]: true }));
     try {
       const storageRef = ref(storage, path);
-      // ✅ pass metadata with contentType
-      await uploadBytes(storageRef, file, { contentType:file.type });
+      await uploadBytes(storageRef, file);
       const url = (await getDownloadURL(storageRef)).trimEnd();
 
       if (section === "hero") {
@@ -430,6 +418,7 @@ export default function ContentEditor() {
       setSaveMessage("Error: Failed to delete item. Check JSON.");
     }
   };
+
 
   const renderVisualEditor = () => {
     if (!activeSection) return <p>Select a section to edit</p>;
