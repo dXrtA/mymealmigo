@@ -453,9 +453,11 @@ export default function AdminRecipesPage() {
                   {form.imageURL && (
                     <button
                       onClick={removeRecipeImage}
-                      className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+                      title="Delete image"
+                      aria-label="Delete image"
+                      className="rounded-md border p-2 hover:bg-red-50 text-red-600"
                     >
-                      Remove
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
@@ -523,18 +525,16 @@ export default function AdminRecipesPage() {
                     }}
                   />
                   <button
-                    aria-label="Remove ingredient"
-                    className="rounded-md border px-3 py-2 hover:bg-gray-50"
-                    onClick={() => {
-                      const arr = [...(form.ingredients || [])];
-                      arr.splice(i, 1);
-                      setForm((f) => ({
-                        ...f,
-                        ingredients: arr.length ? arr : [{ name: "", amount: "" }],
-                      }));
-                    }}
-                  >
-                    Remove
+                      title="Delete ingredient"
+                      aria-label="Delete ingredient"
+                      className="rounded-md border p-2 hover:bg-red-50 text-red-600"
+                      onClick={() => {
+                        const arr = [...(form.ingredients || [])];
+                        arr.splice(i, 1);
+                        setForm((f) => ({ ...f, ingredients: arr.length ? arr : [{ name: "", amount: "" }] }));
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -564,15 +564,16 @@ export default function AdminRecipesPage() {
                     }}
                   />
                   <button
-                    aria-label="Remove step"
-                    className="rounded-md border px-3 py-2 hover:bg-gray-50"
+                    title="Delete step"
+                    aria-label="Delete step"
+                    className="rounded-md border p-2 hover:bg-red-50 text-red-600"
                     onClick={() => {
-                      const arr = [...(form.steps || [])];
-                      arr.splice(i, 1);
-                      setForm((f) => ({ ...f, steps: arr.length ? arr : [""] }));
+                        const arr = [...(form.steps || [])];
+                        arr.splice(i, 1);
+                        setForm((f) => ({ ...f, steps: arr.length ? arr : [""] }));
                     }}
                   >
-                    Remove
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               ))}
