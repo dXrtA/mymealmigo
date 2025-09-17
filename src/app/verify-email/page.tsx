@@ -1,19 +1,24 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function VerifyEmailPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
+
   const router = useRouter();
+  const sp = useSearchParams();
+  const next = sp.get('next') || '/account/health'; // 👈 default to health wizard
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
+    let interval: any;
 
     (async () => {
       const auth = await getClientAuth();
@@ -22,21 +27,41 @@ export default function VerifyEmailPage() {
         return;
       }
 
-      unsub = onAuthStateChanged(auth, (user) => {
+      unsub = onAuthStateChanged(auth, async (user) => {
         if (!user) {
           router.replace('/login');
           return;
         }
+
+        setEmail(user.email);
+
         if (user.emailVerified) {
-          router.replace('/account');
+          setVerified(true);
+          router.replace(next);
           return;
         }
-        setEmail(user.email);
+
+        // Poll every 2s for verification
+        interval = setInterval(async () => {
+          try {
+            await auth.currentUser?.reload();
+            if (auth.currentUser?.emailVerified) {
+              setVerified(true);
+              clearInterval(interval);
+              router.replace(next);
+            }
+          } catch {
+            // ignore reload errors
+          }
+        }, 2000);
       });
     })();
 
-    return () => unsub?.();
-  }, [router]);
+    return () => {
+      unsub?.();
+      if (interval) clearInterval(interval);
+    };
+  }, [router, next]);
 
   const resend = useCallback(async () => {
     setError(null);
@@ -44,36 +69,66 @@ export default function VerifyEmailPage() {
     try {
       const auth = await getClientAuth();
       if (!auth || !auth.currentUser) throw new Error('Not signed in');
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        router.replace(next);
+        return;
+      }
+      const { sendEmailVerification } = await import('firebase/auth');
       await sendEmailVerification(auth.currentUser);
       setSent(true);
     } catch (err) {
       console.error(err);
       setError('Could not send email right now. Try again in a minute.');
     }
-  }, []);
+  }, [router, next]);
 
   return (
     <main className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow p-6">
         <h1 className="text-2xl font-semibold mb-2">Verify your email</h1>
+
         <p className="text-gray-700 mb-4">
           We sent a verification email to{' '}
-          <span className="font-medium">{email ?? 'your address'}</span>. Please
-          click the link inside to verify your account.
+          <span className="font-medium">{email ?? 'your address'}</span>. Click
+          the link to verify. This page will automatically continue once
+          verified.
         </p>
 
-        {sent ? (
-          <p className="text-green-600 mb-4">Verification email sent!</p>
-        ) : (
-          <button
-            onClick={resend}
-            className="w-full bg-[#58e221] text-white py-2 rounded-md hover:opacity-90"
-          >
-            Resend verification email
-          </button>
-        )}
+        {!verified && (
+          <>
+            {sent ? (
+              <p className="text-green-600 mb-4">Verification email sent!</p>
+            ) : (
+              <button
+                onClick={resend}
+                className="w-full bg-[#58e221] text-white py-2 rounded-md hover:opacity-90"
+              >
+                Resend verification email
+              </button>
+            )}
 
-        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+            {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+
+            <div className="mt-4 text-sm text-gray-600">
+              <p>
+                Already clicked the link?{' '}
+                <button
+                  onClick={async () => {
+                    const auth = await getClientAuth();
+                    await auth?.currentUser?.reload();
+                    if (auth?.currentUser?.emailVerified) {
+                      router.replace(next);
+                    }
+                  }}
+                  className="underline text-[#58e221]"
+                >
+                  Continue
+                </button>
+              </p>
+            </div>
+          </>
+        )}
 
         <div className="mt-6 text-center">
           <Link className="text-[#58e221] underline" href="/login">

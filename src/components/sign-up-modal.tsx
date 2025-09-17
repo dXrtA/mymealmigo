@@ -31,14 +31,15 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skipAccountRedirect, setSkipAccountRedirect] = useState(false); // NEW: prevent race to /account
 
-  // If already logged in, close modal and go to Account
+  // If already logged in, close modal and go to Account (unless we're in the middle of signup flow)
   useEffect(() => {
-    if (isOpen && user) {
+    if (isOpen && user && !skipAccountRedirect) {
       onClose();
       router.push('/account');
     }
-  }, [isOpen, user, onClose, router]);
+  }, [isOpen, user, onClose, router, skipAccountRedirect]);
 
   // Close on outside click / ESC
   useEffect(() => {
@@ -65,6 +66,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
     try {
       setLoading(true);
+      setSkipAccountRedirect(true); // NEW: disables the auto-redirect effect during this flow
 
       // 1) Create auth user (role is always FREE)
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
@@ -115,6 +117,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     } catch (err: unknown) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
+      setSkipAccountRedirect(false); // allow normal behavior on error
     } finally {
       setLoading(false);
     }
@@ -125,9 +128,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
   return (
     <>
       {/* Main overlay */}
-      <div
-        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 text-left"
-      >
+      <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 text-left">
         <div
           ref={modalRef}
           role="dialog"
