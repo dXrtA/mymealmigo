@@ -1,33 +1,16 @@
-// File: src/app/verify-email/page.tsx
 'use client';
 
-import React, { Suspense, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-
-// Avoid prerendering; this is an auth-bound, CSR page
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+import { useRouter } from 'next/navigation';
 
 export default function VerifyEmailPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-center">Loading…</div>}>
-      <VerifyEmailClient />
-    </Suspense>
-  );
-}
-
-function VerifyEmailClient() {
   const [email, setEmail] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [verified, setVerified] = useState(false);
-
   const router = useRouter();
-  const sp = useSearchParams();               // ✅ now safely inside Suspense
-  const next = sp.get('next') || '/account/health';
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -48,20 +31,18 @@ function VerifyEmailClient() {
 
         setEmail(user.email);
 
+        // If already verified, go straight to the wizard
         if (user.emailVerified) {
-          setVerified(true);
-          router.replace(next);
+          router.replace('/account/health');
           return;
         }
 
-        // Poll every 2s for verification after they click the email link
+        // Poll every 2s for verification without needing a refresh
         interval = setInterval(async () => {
           try {
             await auth.currentUser?.reload();
             if (auth.currentUser?.emailVerified) {
-              setVerified(true);
-              clearInterval(interval);
-              router.replace(next);
+              router.replace('/account/health');
             }
           } catch {
             /* ignore transient reload errors */
@@ -74,7 +55,7 @@ function VerifyEmailClient() {
       unsub?.();
       if (interval) clearInterval(interval);
     };
-  }, [router, next]);
+  }, [router]);
 
   const resend = useCallback(async () => {
     setError(null);
@@ -82,14 +63,12 @@ function VerifyEmailClient() {
     try {
       const auth = await getClientAuth();
       if (!auth || !auth.currentUser) throw new Error('Not signed in');
-
-      // If already verified, continue immediately
+      // if already verified, continue immediately
       await auth.currentUser.reload();
       if (auth.currentUser.emailVerified) {
-        router.replace(next);
+        router.replace('/account/health');
         return;
       }
-
       const { sendEmailVerification } = await import('firebase/auth');
       await sendEmailVerification(auth.currentUser);
       setSent(true);
@@ -97,53 +76,30 @@ function VerifyEmailClient() {
       console.error(err);
       setError('Could not send email right now. Try again in a minute.');
     }
-  }, [router, next]);
+  }, [router]);
 
   return (
     <main className="min-h-[70vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow p-6">
         <h1 className="text-2xl font-semibold mb-2">Verify your email</h1>
-
         <p className="text-gray-700 mb-4">
           We sent a verification email to{' '}
-          <span className="font-medium">{email ?? 'your address'}</span>. Click
-          the link to verify. This page will continue automatically once verified.
+          <span className="font-medium">{email ?? 'your address'}</span>. Click the link to verify.
+          This page will continue automatically once verified.
         </p>
 
-        {!verified && (
-          <>
-            {sent ? (
-              <p className="text-green-600 mb-4">Verification email sent!</p>
-            ) : (
-              <button
-                onClick={resend}
-                className="w-full bg-[#58e221] text-white py-2 rounded-md hover:opacity-90"
-              >
-                Resend verification email
-              </button>
-            )}
-
-            {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-
-            <div className="mt-4 text-sm text-gray-600">
-              <p>
-                Already clicked the link?{' '}
-                <button
-                  onClick={async () => {
-                    const auth = await getClientAuth();
-                    await auth?.currentUser?.reload();
-                    if (auth?.currentUser?.emailVerified) {
-                      router.replace(next);
-                    }
-                  }}
-                  className="underline text-[#58e221]"
-                >
-                  Continue
-                </button>
-              </p>
-            </div>
-          </>
+        {sent ? (
+          <p className="text-green-600 mb-4">Verification email sent!</p>
+        ) : (
+          <button
+            onClick={resend}
+            className="w-full bg-[#58e221] text-white py-2 rounded-md hover:opacity-90"
+          >
+            Resend verification email
+          </button>
         )}
+
+        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
 
         <div className="mt-6 text-center">
           <Link className="text-[#58e221] underline" href="/login">
