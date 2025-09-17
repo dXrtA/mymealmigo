@@ -1,20 +1,33 @@
+// File: src/app/verify-email/page.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, useEffect, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getClientAuth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+// Avoid prerendering; this is an auth-bound, CSR page
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-center">Loading…</div>}>
+      <VerifyEmailClient />
+    </Suspense>
+  );
+}
+
+function VerifyEmailClient() {
   const [email, setEmail] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
 
   const router = useRouter();
-  const sp = useSearchParams();
-  const next = sp.get('next') || '/account/health'; // 👈 default to health wizard
+  const sp = useSearchParams();               // ✅ now safely inside Suspense
+  const next = sp.get('next') || '/account/health';
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -41,7 +54,7 @@ export default function VerifyEmailPage() {
           return;
         }
 
-        // Poll every 2s for verification
+        // Poll every 2s for verification after they click the email link
         interval = setInterval(async () => {
           try {
             await auth.currentUser?.reload();
@@ -51,7 +64,7 @@ export default function VerifyEmailPage() {
               router.replace(next);
             }
           } catch {
-            // ignore reload errors
+            /* ignore transient reload errors */
           }
         }, 2000);
       });
@@ -69,11 +82,14 @@ export default function VerifyEmailPage() {
     try {
       const auth = await getClientAuth();
       if (!auth || !auth.currentUser) throw new Error('Not signed in');
+
+      // If already verified, continue immediately
       await auth.currentUser.reload();
       if (auth.currentUser.emailVerified) {
         router.replace(next);
         return;
       }
+
       const { sendEmailVerification } = await import('firebase/auth');
       await sendEmailVerification(auth.currentUser);
       setSent(true);
@@ -91,8 +107,7 @@ export default function VerifyEmailPage() {
         <p className="text-gray-700 mb-4">
           We sent a verification email to{' '}
           <span className="font-medium">{email ?? 'your address'}</span>. Click
-          the link to verify. This page will automatically continue once
-          verified.
+          the link to verify. This page will continue automatically once verified.
         </p>
 
         {!verified && (
