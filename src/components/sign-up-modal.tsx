@@ -31,7 +31,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [skipAccountRedirect, setSkipAccountRedirect] = useState(false); // NEW: prevent race to /account
+  const [skipAccountRedirect, setSkipAccountRedirect] = useState(false); // prevent race to /account
 
   // If already logged in, close modal and go to Account (unless we're in the middle of signup flow)
   useEffect(() => {
@@ -66,11 +66,11 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
     try {
       setLoading(true);
-      setSkipAccountRedirect(true); // NEW: disables the auto-redirect effect during this flow
+      setSkipAccountRedirect(true); // disable auto /account redirect during this flow
 
       // 1) Create auth user (role is always FREE)
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      const created = cred.user;
+      const created = cred.user; // <-- use this uid for all writes below
 
       // 2) Basic profile
       if (name.trim()) {
@@ -98,7 +98,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
       // 3b) Starter health_profile doc (wizard will continue to save here)
       await setDoc(
-        doc(db, `users/${created.uid}/health_profile`),
+        doc(db, 'users', created.uid, 'private', 'health_profile'), // <-- fixed path & uses created.uid
         {
           version: 1,
           completed: false,
