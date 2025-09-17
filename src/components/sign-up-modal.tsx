@@ -5,7 +5,6 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   updateProfile,
-  signOut,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -32,7 +31,6 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ title: string; message: string } | null>(null);
 
   // If already logged in, close modal and go to Account
   useEffect(() => {
@@ -96,15 +94,24 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
         { merge: true }
       );
 
-      // 4) Verify & sign out
-      await sendEmailVerification(created);
-      await signOut(auth);
+      // 3b) Starter health_profile doc (wizard will continue to save here)
+      await setDoc(
+        doc(db, `users/${created.uid}/health_profile`),
+        {
+          version: 1,
+          completed: false,
+          riskLevel: 'low',
+          consent: { shareWithCoach: false },
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
 
-      setAlert({
-        title: 'Account Created',
-        message:
-          'We sent a verification link to your email. Verify, then log in. You can upgrade anytime from your Account page.',
-      });
+      // 4) Send verification and route to verify page -> health wizard
+      await sendEmailVerification(created);
+      onClose();
+      router.push('/verify-email?next=/account/health');
     } catch (err: unknown) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
@@ -113,19 +120,13 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
     }
   };
 
-  const closeAlert = () => {
-    setAlert(null);
-    onClose();
-    router.push('/login');
-  };
-
   if (!isOpen) return null;
 
   return (
     <>
       {/* Main overlay */}
       <div
-        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 text-left" // ⬅️ add text-left
+        className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 text-left"
       >
         <div
           ref={modalRef}
@@ -145,7 +146,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 text-left"> {/* ⬅️ add text-left */}
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 text-left">
             <div>
               <label className="mb-1 block text-sm text-gray-700">Name</label>
               <input
@@ -155,7 +156,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
                 placeholder="Your name"
                 autoComplete="name"
                 autoFocus
-                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]" // ⬅️ text-left
+                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]"
               />
             </div>
 
@@ -168,7 +169,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
-                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]" // ⬅️ text-left
+                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]"
               />
             </div>
 
@@ -182,7 +183,7 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
                 minLength={6}
                 required
                 autoComplete="new-password"
-                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]" // ⬅️ text-left
+                className="w-full text-left rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#58e221] focus:border-[#58e221]"
               />
             </div>
 
@@ -203,17 +204,6 @@ export function SignUpModal({ isOpen, onClose }: SignUpModalProps) {
           </form>
         </div>
       </div>
-
-      {/* Success dialog unchanged */}
-      {alert && (
-        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl ring-1 ring-black/5">
-            <h3 className="text-lg font-semibold mb-2">{alert.title}</h3>
-            <p className="text-gray-700 mb-4">{alert.message}</p>
-            <button onClick={closeAlert} className="btn btn-primary w-full">OK</button>
-          </div>
-        </div>
-      )}
     </>
   );
 }
