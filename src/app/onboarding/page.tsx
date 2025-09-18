@@ -2,13 +2,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { defaultHealthProfile, type HealthProfile } from '@/types/health';
 import { Button } from '@/components/ui/button';
 import { getClientAuth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-
 
 const LS_KEY = 'onboarding_health_profile_v1';
 
@@ -19,13 +18,13 @@ type Quiz = {
   goal?: 'weight_loss'|'muscle_gain'|'balanced'|'maintenance';
   dietPreference?: 'no_preference'|'vegetarian'|'vegan'|'pescatarian'|'halal'|'kosher';
   cuisineLikes?: string[];   // e.g. ['asian','mediterranean']
-  foodsToAvoid?: string;     // free text: dislikes/intolerances
+  foodsToAvoid?: string;     // free text
   cookingTime?: '5-10'|'10-20'|'20-30'|'30+';
   budget?: 'low'|'medium'|'high';
   activityLevel?: 'sedentary'|'light'|'moderate'|'active'|'very_active';
 };
 
-const CUISINES = ['asian','mediterranean','mexican','indian','italian','american','middle_eastern','japanese','korean'];
+const CUISINES = ['asian','mediterranean','mexican','indian','italian','american','middle_eastern','japanese','korean'] as const;
 const GOALS = ['weight_loss','muscle_gain','balanced','maintenance'] as const;
 const DIETS = ['no_preference','vegetarian','vegan','pescatarian','halal','kosher'] as const;
 
@@ -33,13 +32,23 @@ export default function OnboardingPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // prefill gender from query
-  const initialSex = sp.get('sex') as 'male'|'female'|null;
+  // read sex from URL once (male|female), use it to prefill demographics.sexAtBirth
+  const sexParam = (sp.get('sex') as 'male'|'female'|null) ?? null;
 
+  // start from default profile (optionally from localStorage), then apply sexParam
   const [hp, setHp] = useState<HealthProfile>(() => {
-    const base = defaultHealthProfile;
-    if (initialSex) {
-      return { ...base, demographics: { ...base.demographics, sexAtBirth: initialSex }};
+    let base = defaultHealthProfile;
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        try { base = { ...defaultHealthProfile, ...(JSON.parse(raw) as Partial<HealthProfile>) }; } catch {}
+      }
+    }
+    if (sexParam) {
+      base = {
+        ...base,
+        demographics: { ...(base.demographics || {}), sexAtBirth: sexParam }
+      };
     }
     return base;
   });
@@ -56,6 +65,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
 
+  // mirror to localStorage so refresh doesn’t lose progress
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(LS_KEY, JSON.stringify(hp));
@@ -81,8 +91,8 @@ export default function OnboardingPage() {
         {step === 0 && <SectionBasics quiz={quiz} setQuiz={setQuiz} />}
         {step === 1 && <SectionGoals quiz={quiz} setQuiz={setQuiz} />}
         {step === 2 && <SectionPreferences quiz={quiz} setQuiz={setQuiz} />}
-        {step === 3 && <SectionConstraints hp={hp} setHp={setHp} quiz={quiz} setQuiz={setQuiz} />}
-        {step === 4 && <SectionSummary quiz={quiz} bmi={bmi} />}
+        {step === 3 && <SectionConsent hp={hp} setHp={setHp} />}
+        {step === 4 && <SectionSummary quiz={quiz} bmi={bmi} sexAtBirth={hp.demographics?.sexAtBirth} />}
 
         <div className="flex items-center justify-between pt-2">
           <div className="text-sm opacity-70">Step {step + 1} / 5</div>
@@ -111,10 +121,12 @@ export default function OnboardingPage() {
               // build the health profile we’ll save
               const final: HealthProfile = {
                 ...hp,
-                completed: true,
+                completed: true, // finished quiz
                 riskLevel: deriveRisk(hp),
                 demographics: {
                   ...(hp.demographics || {}),
+                  // ensure sexAtBirth survives even if local state changed
+                  sexAtBirth: hp.demographics?.sexAtBirth,
                   heightCm: quiz.heightCm,
                   weightKg: quiz.weightKg,
                   birthYear: quiz.birthday ? new Date(quiz.birthday).getFullYear() : hp.demographics?.birthYear,
@@ -125,22 +137,13 @@ export default function OnboardingPage() {
                   preferredIntensity: mapActivityToIntensity(quiz.activityLevel),
                   equipment: hp.fitness?.equipment || [],
                 },
-                conditions: hp.conditions, // already present
-                allergies: hp.allergies,   // already present if you later capture
-                consent: { ...hp.consent, healthConsentAt: hp.consent?.healthConsentAt || new Date().toISOString() },
+                constraints: {
+                  ...(hp.constraints || {}),
+                  notes: [hp.constraints?.notes, summarizePreferences(quiz)].filter(Boolean).join(' • '),
+                },
                 updatedAt: serverTimestamp() as any,
                 createdAt: hp.createdAt || (serverTimestamp() as any),
               };
-
-              // also tuck preferences into constraints/notes (for now)
-              const prefText = [
-                quiz.dietPreference && `Diet: ${quiz.dietPreference}`,
-                quiz.cuisineLikes?.length ? `Cuisines: ${quiz.cuisineLikes.join(', ')}` : '',
-                quiz.foodsToAvoid ? `Avoid: ${quiz.foodsToAvoid}` : '',
-                quiz.cookingTime && `Cooking time: ${quiz.cookingTime} min`,
-                quiz.budget && `Budget: ${quiz.budget}`,
-              ].filter(Boolean).join(' | ');
-              final.constraints = { ...(final.constraints || {}), notes: [final.constraints?.notes, prefText].filter(Boolean).join(' • ') };
 
               // create account now
               const auth = getClientAuth();
@@ -169,11 +172,13 @@ export default function OnboardingPage() {
               );
 
               await sendEmailVerification(created);
+
               // cleanup local
               if (typeof window !== 'undefined') {
                 localStorage.removeItem(LS_KEY);
                 localStorage.removeItem(LS_KEY + '_quiz');
               }
+
               // verify → app
               router.push('/verify-email?next=/app');
             } finally {
@@ -197,7 +202,7 @@ function SectionBasics({ quiz, setQuiz }: { quiz: Quiz; setQuiz: (q: Quiz) => vo
                value={quiz.heightCm ?? ''} onChange={(e)=>setQuiz({ ...quiz, heightCm: +e.target.value || undefined })}/>
         <input className="rounded border p-2" placeholder="Weight (kg)" type="number"
                value={quiz.weightKg ?? ''} onChange={(e)=>setQuiz({ ...quiz, weightKg: +e.target.value || undefined })}/>
-        <input className="rounded border p-2" placeholder="Birthday (yyyy-mm-dd)" type="date"
+        <input className="rounded border p-2" placeholder="Birthday" type="date"
                value={quiz.birthday ?? ''} onChange={(e)=>setQuiz({ ...quiz, birthday: e.target.value || undefined })}/>
       </div>
     </div>
@@ -258,10 +263,7 @@ function SectionPreferences({ quiz, setQuiz }: { quiz: Quiz; setQuiz: (q: Quiz) 
             const active = set.has(c);
             return (
               <button key={c} type="button"
-                onClick={()=>{
-                  active ? set.delete(c) : set.add(c);
-                  setQuiz({ ...quiz, cuisineLikes: Array.from(set) });
-                }}
+                onClick={()=>{ active ? set.delete(c) : set.add(c); setQuiz({ ...quiz, cuisineLikes: Array.from(set) }); }}
                 className={`px-3 py-1 rounded-full border ${active?'bg-black text-white':''}`}>
                 {c.replace('_',' ')}
               </button>
@@ -303,13 +305,10 @@ function SectionPreferences({ quiz, setQuiz }: { quiz: Quiz; setQuiz: (q: Quiz) 
   );
 }
 
-function SectionConstraints({ hp, setHp, quiz, setQuiz }:{
-  hp: HealthProfile; setHp: (h: HealthProfile)=>void; quiz: Quiz; setQuiz: (q: Quiz)=>void;
-}) {
+function SectionConsent({ hp, setHp }:{ hp: HealthProfile; setHp: (h: HealthProfile)=>void }) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">A few health checks</h2>
-      {/* Minimal consent so we can save the health data when they sign up */}
       <label className="flex items-center gap-2">
         <input type="checkbox"
           checked={!!hp.consent?.healthConsentAt}
@@ -321,11 +320,12 @@ function SectionConstraints({ hp, setHp, quiz, setQuiz }:{
   );
 }
 
-function SectionSummary({ quiz, bmi }:{ quiz: Quiz; bmi: number|null }) {
+function SectionSummary({ quiz, bmi, sexAtBirth }:{ quiz: Quiz; bmi: number|null; sexAtBirth?: 'male'|'female'|'intersex'|'prefer_not_to_say' }) {
   return (
     <div className="space-y-2">
       <h2 className="text-lg font-semibold">Summary</h2>
       <div className="text-sm opacity-80">
+        {sexAtBirth ? <>Sex: <b>{sexAtBirth}</b> • </> : null}
         {quiz.heightCm ? <>Height: <b>{quiz.heightCm} cm</b> • </> : null}
         {quiz.weightKg ? <>Weight: <b>{quiz.weightKg} kg</b> • </> : null}
         {bmi ? <>BMI: <b>{bmi}</b> • </> : null}
@@ -381,4 +381,14 @@ function mapActivityToIntensity(a?: Quiz['activityLevel']) {
   if (a === 'moderate') return 'medium';
   if (a === 'active' || a === 'very_active') return 'high';
   return undefined;
+}
+function summarizePreferences(q: Quiz) {
+  const parts = [
+    q.dietPreference && `Diet: ${q.dietPreference}`,
+    q.cuisineLikes?.length ? `Cuisines: ${q.cuisineLikes.join(', ')}` : '',
+    q.foodsToAvoid ? `Avoid: ${q.foodsToAvoid}` : '',
+    q.cookingTime && `Cooking time: ${q.cookingTime}`,
+    q.budget && `Budget: ${q.budget}`,
+  ].filter(Boolean);
+  return parts.join(' | ');
 }
