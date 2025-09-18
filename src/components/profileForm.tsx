@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
@@ -9,10 +9,10 @@ type Sex = "male" | "female" | "other";
 
 type Profile = {
   displayName?: string;
-  birthday?: string;       // ISO yyyy-mm-dd
+  birthday?: string;       // ISO yyyy-mm-dd (stored in users/{uid}.profile)
   heightCm?: number;
   weightKg?: number;
-  sex?: Sex;
+  sex?: Sex;               // UX label; mapped to sexAtBirth in health_profile
 };
 
 type FirestoreUserDoc = {
@@ -23,6 +23,14 @@ type FirestoreUserDoc = {
     weightKg?: number;
     sex?: Sex;
   };
+};
+
+type HealthProfileDemographics = {
+  birthYear?: number;
+  sexAtBirth?: "male" | "female" | "intersex" | "prefer_not_to_say";
+  heightCm?: number;
+  weightKg?: number;
+  country?: string;
 };
 
 export default function ProfileForm() {
@@ -37,26 +45,45 @@ export default function ProfileForm() {
     let cancelled = false;
     (async () => {
       if (!user) return;
+
       try {
-        const ref = doc(db, "users", user.uid);
-        const snap = await getDoc(ref);
-        if (cancelled) return;
+        // 1) Basic user doc
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        const userData = (userSnap.data() ?? {}) as FirestoreUserDoc;
 
-        const data = (snap.data() ?? {}) as FirestoreUserDoc;
+        // 2) Health profile (private)
+        const hpRef = doc(db, "users", user.uid, "private", "health_profile");
+        const hpSnap = await getDoc(hpRef);
+        const hp = hpSnap.exists() ? (hpSnap.data() as { demographics?: HealthProfileDemographics }) : {};
 
-        setProfile({
-          displayName: data.name ?? user.displayName ?? "",
-          birthday: data.profile?.birthday ?? "",
-          heightCm: data.profile?.heightCm ?? undefined,
-          weightKg: data.profile?.weightKg ?? undefined,
-          sex: data.profile?.sex ?? "other",
-        });
+        // Prefer values from health_profile.demographics if present
+        const d = hp.demographics ?? {};
+        const sexFromHP: Sex | undefined =
+          d.sexAtBirth === "male" || d.sexAtBirth === "female"
+            ? d.sexAtBirth
+            : d.sexAtBirth
+            ? "other"
+            : undefined;
+
+        const merged: Profile = {
+          displayName: userData.name ?? user.displayName ?? "",
+          // birthday is only stored in users/{uid}.profile (string)
+          birthday: userData.profile?.birthday ?? "",
+          // prefer HP height/weight; fallback to users.profile
+          heightCm: d.heightCm ?? userData.profile?.heightCm ?? undefined,
+          weightKg: d.weightKg ?? userData.profile?.weightKg ?? undefined,
+          // prefer HP sex; fallback to users.profile.sex
+          sex: sexFromHP ?? userData.profile?.sex ?? "other",
+        };
+
+        if (!cancelled) setProfile(merged);
       } catch (e: unknown) {
         const message =
           typeof e === "object" && e && "message" in e
             ? String((e as { message?: string }).message)
             : "Failed to load profile.";
-        setErr(message);
+        if (!cancelled) setErr(message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -72,8 +99,9 @@ export default function ProfileForm() {
     setMsg(null);
     setErr(null);
     try {
-      const ref = doc(db, "users", user.uid);
-      await updateDoc(ref, {
+      // --- Save 1: users/{uid} (your existing shape) ---
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
         name: profile.displayName ?? null,
         profile: {
           birthday: profile.birthday || null,
@@ -84,8 +112,37 @@ export default function ProfileForm() {
         },
         updatedAt: serverTimestamp(),
       });
+
+      // --- Save 2: users/{uid}/private/health_profile (demographics only) ---
+      const hpRef = doc(db, "users", user.uid, "private", "health_profile");
+      // compute birthYear if we have a birthday string
+      const birthYear =
+        profile.birthday && /^\d{4}-\d{2}-\d{2}$/.test(profile.birthday)
+          ? new Date(profile.birthday).getFullYear()
+          : undefined;
+
+      // Map our "sex" to health_profile.sexAtBirth
+      let sexAtBirth: HealthProfileDemographics["sexAtBirth"] | undefined;
+      if (profile.sex === "male" || profile.sex === "female") sexAtBirth = profile.sex;
+      else sexAtBirth = "prefer_not_to_say";
+
+      await setDoc(
+        hpRef,
+        {
+          demographics: {
+            // Only set fields when they’re defined; null removes the key during merge,
+            // so we omit undefined ones instead of forcing nulls here.
+            ...(typeof profile.heightCm === "number" ? { heightCm: profile.heightCm } : {}),
+            ...(typeof profile.weightKg === "number" ? { weightKg: profile.weightKg } : {}),
+            ...(typeof birthYear === "number" ? { birthYear } : {}),
+            ...(sexAtBirth ? { sexAtBirth } : {}),
+          },
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
       setMsg("Profile saved.");
-      // auto-clear success after a moment
       setTimeout(() => setMsg(null), 2500);
     } catch (e: unknown) {
       const message =
@@ -169,9 +226,7 @@ export default function ProfileForm() {
           <select
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={profile.sex ?? "other"}
-            onChange={(e) =>
-              setProfile((p) => ({ ...p, sex: e.target.value as Sex }))
-            }
+            onChange={(e) => setProfile((p) => ({ ...p, sex: e.target.value as Sex }))}
           >
             <option value="male">Male</option>
             <option value="female">Female</option>
