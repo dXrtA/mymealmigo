@@ -73,7 +73,7 @@ export default function Home() {
             href="/onboarding?sex=female"
             className="rounded-full bg-[#58e221] px-8 py-3 text-white font-medium hover:opacity-90 text-center"
           >
-            Female
+            Femalee
           </Link>
         </div>
       </Hero>
