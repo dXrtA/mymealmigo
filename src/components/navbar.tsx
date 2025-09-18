@@ -7,7 +7,6 @@ import { getClientAuth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, loading, isAdmin } = useAuth();
@@ -81,7 +80,7 @@ export function Navbar() {
               </Link>
             
               <Link
-                href="/ProjectWebsite"
+                href="/#ProjectWebsite"
                 className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
               >
                 About Project
