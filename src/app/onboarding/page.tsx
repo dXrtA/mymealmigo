@@ -9,6 +9,22 @@ import { getClientAuth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
+function stripUndefined(obj: unknown): any {
+  if (Array.isArray(obj)) {
+    return obj.map((v) => stripUndefined(v));
+  }
+  if (obj && typeof obj === "object") {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const cleaned = stripUndefined(v);
+      if (cleaned !== undefined) out[k] = cleaned; // omit undefined keys
+    }
+    return out;
+  }
+  // primitive
+  return obj; // may be undefined; parent call decides to omit it
+}
+
 const LS_KEY = 'onboarding_health_profile_v1';
 
 type Quiz = {
@@ -129,8 +145,7 @@ function OnboardingForm() {
                 riskLevel: deriveRisk(hp),
                 demographics: {
                   ...(hp.demographics || {}),
-                  // ensure sexAtBirth survives even if local state changed
-                  sexAtBirth: hp.demographics?.sexAtBirth,
+                  ...(hp.demographics?.sexAtBirth ? { sexAtBirth: hp.demographics.sexAtBirth } : {}),
                   heightCm: quiz.heightCm,
                   weightKg: quiz.weightKg,
                   birthYear: quiz.birthday ? new Date(quiz.birthday).getFullYear() : hp.demographics?.birthYear,
@@ -171,7 +186,7 @@ function OnboardingForm() {
               // users/{uid}/private/health_profile
               await setDoc(
                 doc(db, 'users', created.uid, 'private', 'health_profile'),
-                final,
+                stripUndefined(final),
                 { merge: true }
               );
 
