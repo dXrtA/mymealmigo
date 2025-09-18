@@ -2,233 +2,100 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, LogOut } from "lucide-react";
-import { getClientAuth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { Features } from "@/components/features";
+import { Pricing } from "@/components/pricing";
+import { Testimonials } from "@/components/testimonials";
+import { HowItWorks } from "@/components/how-it-works";
+import { SignUpModal } from "@/components/sign-up-modal";
+import UpgradeToPremiumModal from "@/components/UpgradeToPremiumModal";
+import { useContent } from "@/context/ContentProvider";
+import { Hero } from "@/components/hero";
 import { useAuth } from "@/context/AuthContext";
+import { Download } from "@/components/download"; 
 
-export function Navbar() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, loading, isAdmin } = useAuth();
+export default function Home() {
   const router = useRouter();
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"free" | "premium" | null>(null);
 
-  const handleLogout = async () => {
-    try {
-      const auth = await getClientAuth();
-      if (!auth) throw new Error("Auth not available on server");
-      await signOut(auth);
-      router.push("/");
-      setMobileMenuOpen(false);
-    } catch (err) {
-      console.error("Error logging out:", err);
-      router.push("/");
-      setMobileMenuOpen(false);
+  const { hero, features, howItWorks, pricing, testimonials, isLoading } = useContent();
+  const { user } = useAuth();
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  const mappedFeatures = features;
+
+  // still used by Pricing (kept so its CTA works)
+  const openModal = (role?: "free" | "premium") => {
+    if (user) {
+      if (role === "premium") {
+        setShowUpgrade(true);
+      } else {
+        router.push("/account");
+      }
+      return;
     }
+    setSelectedRole(role || null);
+    setShowSignUp(true);
   };
 
-  if (loading) return <div className="bg-white h-16 animate-pulse" />;
+  const closeModal = () => {
+    setShowSignUp(false);
+    setSelectedRole(null);
+  };
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Left: Brand + Links */}
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Link href="/" className="text-xl font-bold text-[#58e221]">
-                MyMealMigo
-              </Link>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-6 lg:space-x-8">
-              <Link
-                href="/#features"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                Features
-              </Link>
-              <Link
-                href="/#pricing"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                Pricing
-              </Link>
-              <Link
-                href="/#testimonials"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                Testimonials
-              </Link>
-              <Link
-                href="/#howitworks"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                How It Works
-              </Link>
-              <Link
-                href="/#download"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                Download
-              </Link>
-              <Link
-                href="/calculators"
-                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                Calculators
-              </Link>
-
-              
-              <Link
-                href="/ProjectWebsite"
-                className="text-gray-500 hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-              >
-                About Project
-              </Link>
-
-              {user && isAdmin && (
-                <Link
-                  href="/admin/dashboard"
-                  className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
-                >
-                  Admin Dashboard
-                </Link>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Auth actions */}
-          <div className="hidden sm:flex sm:items-center sm:space-x-4">
-            {user ? (
-              <>
-                <Link
-                  href="/account"
-                  className="text-gray-700 text-sm font-medium hidden md:block truncate max-w-[150px] hover:text-[#58e221]"
-                  title="Account"
-                >
-                  {user.displayName || user.email || "Account"}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-[#58e221] focus:outline-none focus:ring-2 focus:ring-[#58e221]"
-                  aria-label="Logout"
-                >
-                  <LogOut className="mr-2 h-5 w-5" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#58e221]"
-              >
-                Login
-              </Link>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="flex items-center sm:hidden">
-            <button
-              type="button"
-              className="bg-white inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#58e221]"
-              aria-controls="mobile-menu"
-              aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              <span className="sr-only">Open main menu</span>
-              <Menu className="h-6 w-6" />
-            </button>
-          </div>
+    <div className="font-sans antialiased text-gray-800 bg-white">
+      <Hero
+        title1={hero.title1 || "Eat Smart,"}
+        title2={hero.title2 || "Live Better."}
+        description={
+          hero.description ||
+          "MyMealMigo is your all-in-one nutrition companion that makes healthy eating simple, personalized, and fun."
+        }
+        videoURL={hero.videoURL}
+        imageURL={hero.imageURL}
+        mediaType={hero.mediaType || "image"}
+      >
+        {/* Unimeal-style CTA: Male / Female — no Get Started, no Learn More, no About Project */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link
+            href="/onboarding?sex=male"
+            className="rounded-full bg-[#58e221] px-8 py-3 text-white font-medium hover:opacity-90 text-center"
+          >
+            Male
+          </Link>
+          <Link
+            href="/onboarding?sex=female"
+            className="rounded-full bg-[#58e221] px-8 py-3 text-white font-medium hover:opacity-90 text-center"
+          >
+            Female
+          </Link>
         </div>
-      </div>
+      </Hero>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <div className="sm:hidden" id="mobile-menu">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              href="/#features"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Features
-            </Link>
-            <Link
-              href="/#pricing"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Pricing
-            </Link>
-            <Link
-              href="/#testimonials"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Testimonials
-            </Link>
-            <Link
-              href="/#howitworks"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              How It Works
-            </Link>
-            <Link
-              href="/#download"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Download
-            </Link>
-            <Link
-              href="/calculators"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Calculators
-            </Link>
+      <Features features={mappedFeatures} />
+      <Pricing plans={pricing} onOpenModal={openModal} />
+      <Testimonials testimonials={testimonials} />
+      <HowItWorks steps={howItWorks} />
 
-            {/* About Project → page link */}
-            <Link
-              href="/ProjectWebsite"
-              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              About Project
-            </Link>
+      {/* ✅ Download section on the home page */}
+      <Download />
 
-            {user ? (
-              <>
-                <Link
-                  href="/account"
-                  className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {user.displayName || user.email || "Account"}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-[#58e221]"
-                  aria-label="Logout"
-                >
-                  <LogOut className="mr-2 h-5 w-5" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:bg-gray-50"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Login
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </nav>
+      {/* Modals (kept so Pricing CTA continues to work) */}
+      <SignUpModal
+        isOpen={showSignUp}
+        onClose={closeModal}
+        initialRole={selectedRole || undefined}
+      />
+      <UpgradeToPremiumModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+      />
+    </div>
   );
 }
