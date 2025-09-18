@@ -79,9 +79,9 @@ export function Navbar() {
               >
                 Calculators
               </Link>
-              {/* NEW: About Project moved into navbar */}
+            
               <Link
-                href="/about-project"
+                href="/ProjectWebsite"
                 className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
               >
                 About Project
@@ -196,7 +196,7 @@ export function Navbar() {
             </Link>
             {/* NEW: About Project in mobile menu */}
             <Link
-              href="/about-project"
+              href="/ProjectWebsite"
               className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
