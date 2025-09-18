@@ -8,6 +8,7 @@ import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
+
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, loading, isAdmin } = useAuth();
@@ -190,7 +191,7 @@ export function Navbar() {
               Calculators
             </Link>
 
-            {/* About Project → page link */}
+            
             <Link
               href="/about-project"
               className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
