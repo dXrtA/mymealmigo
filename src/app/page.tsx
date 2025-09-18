@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Features } from "@/components/features";
 import { Pricing } from "@/components/pricing";
@@ -12,14 +13,13 @@ import { ProjectWebsite } from "@/components/ProjectWebsite";
 import { useContent } from "@/context/ContentProvider";
 import { Hero } from "@/components/hero";
 import { useAuth } from "@/context/AuthContext";
-import { Download } from "@/components/download"; // ✅ bring back Download
+import { Download } from "@/components/download"; // ✅ keep Download
 
 export default function Home() {
   const router = useRouter();
   const [showProject, setShowProject] = useState(false);
   const [showSignUp, setShowSignUp] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-
   const [selectedRole, setSelectedRole] = useState<"free" | "premium" | null>(null);
 
   const { hero, features, howItWorks, pricing, testimonials, isLoading } = useContent();
@@ -31,6 +31,7 @@ export default function Home() {
 
   const mappedFeatures = features;
 
+  // still used by Pricing (don’t remove to avoid breaking its CTA behavior)
   const openModal = (role?: "free" | "premium") => {
     if (user) {
       if (role === "premium") {
@@ -58,33 +59,28 @@ export default function Home() {
       ) : (
         <>
           <Hero
-            title1={hero.title1 || "Test"}
-            title2={hero.title2 || "Made Simple"}
-            description={hero.description || "Track your diet and health with ease."}
+            title1={hero.title1 || "Eat Smart,"}
+            title2={hero.title2 || "Live Better."}
+            description={hero.description || "MyMealMigo is your all-in-one nutrition companion that makes healthy eating simple, personalized, and fun."}
             videoURL={hero.videoURL}
             imageURL={hero.imageURL}
             mediaType={hero.mediaType || "image"}
           >
-            {!user && (
-              <button
-                onClick={() => openModal("free")}
-                className="btn btn-primary btn-lg"
+            {/* ⬇️ Unimeal-style CTA: Male / Female — no Get Started, no Learn More, no About Project */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href="/onboarding?sex=male"
+                className="rounded-full bg-[#58e221] px-8 py-3 text-white font-medium hover:opacity-90 text-center"
               >
-                Get Started
-              </button>
-            )}
-            <a
-              href="#features"
-              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
-            >
-              Learn More
-            </a>
-            <button
-              onClick={() => setShowProject(true)}
-              className="mt-3 sm:mt-0 sm:ml-3 w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[#58e221] bg-white hover:bg-gray-100 md:py-4 md:text-lg md:px-10"
-            >
-              About Project
-            </button>
+                Male
+              </Link>
+              <Link
+                href="/onboarding?sex=female"
+                className="rounded-full bg-[#58e221] px-8 py-3 text-white font-medium hover:opacity-90 text-center"
+              >
+                Female
+              </Link>
+            </div>
           </Hero>
 
           <Features features={mappedFeatures} />
@@ -95,7 +91,7 @@ export default function Home() {
           {/* ✅ Download section on the home page */}
           <Download />
 
-          {/* Modals */}
+          {/* Modals (kept so Pricing CTA continues to work) */}
           <SignUpModal
             isOpen={showSignUp}
             onClose={closeModal}

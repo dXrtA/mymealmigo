@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, LogOut } from "lucide-react";
-import { SignUpModal } from "@/components/sign-up-modal";
 import { getClientAuth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -11,7 +10,6 @@ import { useAuth } from "@/context/AuthContext";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showSignUp, setShowSignUp] = useState(false);
   const { user, loading, isAdmin } = useAuth();
   const router = useRouter();
 
@@ -37,6 +35,7 @@ export function Navbar() {
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+          {/* Left: Brand + Links */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <Link href="/" className="text-xl font-bold text-[#58e221]">
@@ -69,7 +68,7 @@ export function Navbar() {
                 How It Works
               </Link>
               <Link
-                href="/#download"  // section on the homepage
+                href="/#download"
                 className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
               >
                 Download
@@ -79,6 +78,13 @@ export function Navbar() {
                 className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
               >
                 Calculators
+              </Link>
+              {/* NEW: About Project moved into navbar */}
+              <Link
+                href="/about-project"
+                className="text-gray-500 hover:border-[#58e221] hover:text-[#58e221] inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium"
+              >
+                About Project
               </Link>
 
               {user && isAdmin && (
@@ -92,10 +98,11 @@ export function Navbar() {
             </div>
           </div>
 
+          {/* Right: Auth actions */}
           <div className="hidden sm:flex sm:items-center sm:space-x-4">
             {user ? (
               <>
-                {/* 🔁 REPLACEMENT #1 (desktop): make username clickable */}
+                {/* Username → Account */}
                 <Link
                   href="/account"
                   className="text-gray-700 text-sm font-medium hidden md:block truncate max-w-[150px] hover:text-[#58e221]"
@@ -114,13 +121,7 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => setShowSignUp(true)}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#58e221] to-[#2df041] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#58e221]"
-                  aria-label="Sign Up"
-                >
-                  Sign Up
-                </button>
+                {/* Sign Up removed per request */}
                 <Link
                   href="/login"
                   className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#58e221]"
@@ -131,6 +132,7 @@ export function Navbar() {
             )}
           </div>
 
+          {/* Mobile menu button */}
           <div className="flex items-center sm:hidden">
             <button
               type="button"
@@ -146,6 +148,7 @@ export function Navbar() {
         </div>
       </div>
 
+      {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="sm:hidden" id="mobile-menu">
           <div className="pt-2 pb-3 space-y-1">
@@ -191,20 +194,18 @@ export function Navbar() {
             >
               Calculators
             </Link>
-
-            {user && isAdmin && (
-              <Link
-                href="/admin/dashboard"
-                className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Admin Dashboard
-              </Link>
-            )}
+            {/* NEW: About Project in mobile menu */}
+            <Link
+              href="/about-project"
+              className="text-gray-500 hover:bg-gray-50 hover:text-[#58e221] block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              About Project
+            </Link>
 
             {user ? (
               <>
-                {/* 🔁 REPLACEMENT #2 (mobile): make username clickable */}
+                {/* Account + Logout */}
                 <Link
                   href="/account"
                   className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
@@ -223,16 +224,7 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    setShowSignUp(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-[#58e221] hover:bg-gray-50"
-                  aria-label="Sign Up"
-                >
-                  Sign Up
-                </button>
+                {/* Sign Up removed per request */}
                 <Link
                   href="/login"
                   className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:bg-gray-50"
@@ -245,8 +237,6 @@ export function Navbar() {
           </div>
         </div>
       )}
-
-      <SignUpModal isOpen={showSignUp} onClose={() => setShowSignUp(false)} />
     </nav>
   );
 }
