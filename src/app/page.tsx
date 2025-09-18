@@ -82,7 +82,7 @@ export default function Home() {
       <Pricing plans={pricing} onOpenModal={openModal} />
       <Testimonials testimonials={testimonials} />
       <HowItWorks steps={howItWorks} />
-
+      
       {/* ✅ Download section on the home page */}
       <Download />
 
