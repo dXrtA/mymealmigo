@@ -55,7 +55,7 @@ export default function Home() {
         title2={hero.title2 || "Live Better."}
         description={
           hero.description ||
-          "MyMealMigo is your all-in-one nutrition companion that makes healthy eating simple, personalized, and fun."
+          "MyMealMigo is your all-in-one nutrition companion that makes healthy eating simple, personalized, and fun. Take our Quiz to get a personal meal plan."
         }
         videoURL={hero.videoURL}
         imageURL={hero.imageURL}
