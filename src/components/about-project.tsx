@@ -1,6 +1,6 @@
-export function ProjectWebsite() {
+export function AboutProject() {
   return (
-    <div className="project-website bg-white p-8 rounded-lg max-w-6xl mx-auto">
+    <div className="about-project bg-white p-8 rounded-lg max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8 border-b pb-4 border-[#80e259]">
         <h1 className="text-4xl font-bold bg-gradient-to-r from-[#58e221] to-[#80e259] text-transparent bg-clip-text">
           FYP-25-S3-09 : MyMealMigo
