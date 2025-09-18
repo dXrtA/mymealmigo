@@ -1,7 +1,7 @@
 // File: src/app/onboarding/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { defaultHealthProfile, type HealthProfile } from '@/types/health';
 import { Button } from '@/components/ui/button';
@@ -29,11 +29,15 @@ const GOALS = ['weight_loss','muscle_gain','balanced','maintenance'] as const;
 const DIETS = ['no_preference','vegetarian','vegan','pescatarian','halal','kosher'] as const;
 
 export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center h-screen">Loading...</div>}>
+      <OnboardingForm />
+    </Suspense>
+  );
+}
+function OnboardingForm() {  
   const router = useRouter();
   const sp = useSearchParams();
-
-  // read sex from URL once (male|female), use it to prefill demographics.sexAtBirth
-  const sexParam = (sp.get('sex') as 'male'|'female'|null) ?? null;
 
   // start from default profile (optionally from localStorage), then apply sexParam
   const [hp, setHp] = useState<HealthProfile>(() => {
@@ -43,12 +47,6 @@ export default function OnboardingPage() {
       if (raw) {
         try { base = { ...defaultHealthProfile, ...(JSON.parse(raw) as Partial<HealthProfile>) }; } catch {}
       }
-    }
-    if (sexParam) {
-      base = {
-        ...base,
-        demographics: { ...(base.demographics || {}), sexAtBirth: sexParam }
-      };
     }
     return base;
   });
@@ -65,18 +63,24 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
 
-  // mirror to localStorage so refresh doesn’t lose progress
+  // mirror HP to localStorage so refresh doesn’t lose progress
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(LS_KEY, JSON.stringify(hp));
+    }
+  }, [hp]);
+
+  // mirror QUIZ to localStorage so refresh doesn’t lose progress
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
       localStorage.setItem(LS_KEY + '_quiz', JSON.stringify(quiz));
     }
-  }, [hp, quiz]);
+  }, [quiz]);
 
   const bmi = useMemo(() => {
     if (!quiz.heightCm || !quiz.weightKg) return null;
     const h = quiz.heightCm / 100;
-    return +(quiz.weightKg / (h*h)).toFixed(1);
+    return +(quiz.weightKg / (h * h)).toFixed(1);
   }, [quiz.heightCm, quiz.weightKg]);
 
   function next() { setStep((s) => Math.min(4, s + 1)); }
