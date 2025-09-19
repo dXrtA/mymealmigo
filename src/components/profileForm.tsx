@@ -1,18 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
 type Sex = "male" | "female" | "other";
+type Intensity = "low" | "medium" | "high" | "";
+type Goal = "weight_loss" | "cardio" | "strength" | "mobility" | "";
 
 type Profile = {
   displayName?: string;
-  birthday?: string;       // ISO yyyy-mm-dd (stored in users/{uid}.profile)
+  birthday?: string; // yyyy-mm-dd (users/{uid}.profile)
   heightCm?: number;
   weightKg?: number;
-  sex?: Sex;               // UX label; mapped to sexAtBirth in health_profile
+  sex?: Sex;
+
+  // Onboarding-derived (users/{uid}/private/health_profile)
+  goal?: Goal;
+  preferredIntensity?: Intensity;
+  equipment?: string[];
+  notes?: string;            // constraints.notes
+  shareWithCoach?: boolean;  // consent.shareWithCoach
 };
 
 type FirestoreUserDoc = {
@@ -25,13 +34,27 @@ type FirestoreUserDoc = {
   };
 };
 
-type HealthProfileDemographics = {
-  birthYear?: number;
-  sexAtBirth?: "male" | "female" | "intersex" | "prefer_not_to_say";
-  heightCm?: number;
-  weightKg?: number;
-  country?: string;
+type HealthProfileDoc = {
+  demographics?: {
+    birthYear?: number;
+    sexAtBirth?: "male" | "female" | "intersex" | "prefer_not_to_say";
+    heightCm?: number;
+    weightKg?: number;
+  };
+  fitness?: {
+    goal?: Goal;
+    preferredIntensity?: Intensity;
+    equipment?: string[];
+  };
+  constraints?: {
+    notes?: string;
+  };
+  consent?: {
+    shareWithCoach?: boolean;
+  };
 };
+
+const EQUIPMENT = ["none", "mat", "dumbbells", "resistance_band", "barbell", "bike", "treadmill"] as const;
 
 export default function ProfileForm() {
   const { user } = useAuth();
@@ -41,23 +64,27 @@ export default function ProfileForm() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Helpers to avoid writing undefined
+  const maybe = <T,>(cond: boolean, obj: T) => (cond ? obj : {});
+  const isNum = (v: unknown): v is number => typeof v === "number" && !Number.isNaN(v);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!user) return;
 
       try {
-        // 1) Basic user doc
+        // 1) users/{uid}
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
         const userData = (userSnap.data() ?? {}) as FirestoreUserDoc;
 
-        // 2) Health profile (private)
+        // 2) users/{uid}/private/health_profile
         const hpRef = doc(db, "users", user.uid, "private", "health_profile");
         const hpSnap = await getDoc(hpRef);
-        const hp = hpSnap.exists() ? (hpSnap.data() as { demographics?: HealthProfileDemographics }) : {};
+        const hp = (hpSnap.exists() ? hpSnap.data() : {}) as HealthProfileDoc;
 
-        // Prefer values from health_profile.demographics if present
+        // Prefer HP demographics > users.profile
         const d = hp.demographics ?? {};
         const sexFromHP: Sex | undefined =
           d.sexAtBirth === "male" || d.sexAtBirth === "female"
@@ -68,13 +95,16 @@ export default function ProfileForm() {
 
         const merged: Profile = {
           displayName: userData.name ?? user.displayName ?? "",
-          // birthday is only stored in users/{uid}.profile (string)
           birthday: userData.profile?.birthday ?? "",
-          // prefer HP height/weight; fallback to users.profile
           heightCm: d.heightCm ?? userData.profile?.heightCm ?? undefined,
           weightKg: d.weightKg ?? userData.profile?.weightKg ?? undefined,
-          // prefer HP sex; fallback to users.profile.sex
           sex: sexFromHP ?? userData.profile?.sex ?? "other",
+
+          goal: hp.fitness?.goal ?? "",
+          preferredIntensity: hp.fitness?.preferredIntensity ?? "",
+          equipment: hp.fitness?.equipment ?? [],
+          notes: hp.constraints?.notes ?? "",
+          shareWithCoach: hp.consent?.shareWithCoach ?? false,
         };
 
         if (!cancelled) setProfile(merged);
@@ -93,49 +123,68 @@ export default function ProfileForm() {
     };
   }, [user]);
 
+  const birthYear = useMemo(() => {
+    if (!profile.birthday) return undefined;
+    const ok = /^\d{4}-\d{2}-\d{2}$/.test(profile.birthday);
+    return ok ? new Date(profile.birthday).getFullYear() : undefined;
+  }, [profile.birthday]);
+
+  const toggleEquip = (key: string) => {
+    setProfile((p) => {
+      const set = new Set(p.equipment ?? []);
+      set.has(key) ? set.delete(key) : set.add(key);
+      return { ...p, equipment: Array.from(set) };
+    });
+  };
+
   const save = async () => {
     if (!user) return;
     setSaving(true);
     setMsg(null);
     setErr(null);
     try {
-      // --- Save 1: users/{uid} (your existing shape) ---
+      // 1) users/{uid} (your existing place for display/birthday/basic stats)
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         name: profile.displayName ?? null,
         profile: {
           birthday: profile.birthday || null,
-          heightCm: typeof profile.heightCm === "number" ? profile.heightCm : null,
-          weightKg: typeof profile.weightKg === "number" ? profile.weightKg : null,
+          heightCm: isNum(profile.heightCm) ? profile.heightCm : null,
+          weightKg: isNum(profile.weightKg) ? profile.weightKg : null,
           sex: (profile.sex as Sex) ?? "other",
           updatedAt: serverTimestamp(),
         },
         updatedAt: serverTimestamp(),
       });
 
-      // --- Save 2: users/{uid}/private/health_profile (demographics only) ---
+      // 2) users/{uid}/private/health_profile (source of truth for onboarding answers)
       const hpRef = doc(db, "users", user.uid, "private", "health_profile");
-      // compute birthYear if we have a birthday string
-      const birthYear =
-        profile.birthday && /^\d{4}-\d{2}-\d{2}$/.test(profile.birthday)
-          ? new Date(profile.birthday).getFullYear()
-          : undefined;
 
-      // Map our "sex" to health_profile.sexAtBirth
-      let sexAtBirth: HealthProfileDemographics["sexAtBirth"] | undefined;
-      if (profile.sex === "male" || profile.sex === "female") sexAtBirth = profile.sex;
-      else sexAtBirth = "prefer_not_to_say";
+      // map UX `sex` -> `sexAtBirth`
+      const sexAtBirth =
+        profile.sex === "male" || profile.sex === "female"
+          ? profile.sex
+          : "prefer_not_to_say";
 
       await setDoc(
         hpRef,
         {
           demographics: {
-            // Only set fields when they’re defined; null removes the key during merge,
-            // so we omit undefined ones instead of forcing nulls here.
-            ...(typeof profile.heightCm === "number" ? { heightCm: profile.heightCm } : {}),
-            ...(typeof profile.weightKg === "number" ? { weightKg: profile.weightKg } : {}),
-            ...(typeof birthYear === "number" ? { birthYear } : {}),
-            ...(sexAtBirth ? { sexAtBirth } : {}),
+            ...maybe(isNum(profile.heightCm ?? undefined), { heightCm: profile.heightCm }),
+            ...maybe(isNum(profile.weightKg ?? undefined), { weightKg: profile.weightKg }),
+            ...maybe(typeof birthYear === "number", { birthYear }),
+            ...maybe(Boolean(sexAtBirth), { sexAtBirth }),
+          },
+          fitness: {
+            ...maybe(Boolean(profile.goal), { goal: profile.goal }),
+            ...maybe(Boolean(profile.preferredIntensity), { preferredIntensity: profile.preferredIntensity }),
+            ...maybe(Boolean(profile.equipment && profile.equipment.length), { equipment: profile.equipment }),
+          },
+          constraints: {
+            ...maybe(Boolean(profile.notes), { notes: profile.notes }),
+          },
+          consent: {
+            ...maybe(typeof profile.shareWithCoach === "boolean", { shareWithCoach: !!profile.shareWithCoach }),
           },
           updatedAt: serverTimestamp(),
         },
@@ -143,7 +192,7 @@ export default function ProfileForm() {
       );
 
       setMsg("Profile saved.");
-      setTimeout(() => setMsg(null), 2500);
+      setTimeout(() => setMsg(null), 2400);
     } catch (e: unknown) {
       const message =
         typeof e === "object" && e && "message" in e
@@ -166,6 +215,7 @@ export default function ProfileForm() {
       {err && <p className="text-red-600 text-sm mb-2">{err}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Account name */}
         <label className="block">
           <span className="text-sm text-gray-700">Account Name</span>
           <input
@@ -175,6 +225,7 @@ export default function ProfileForm() {
           />
         </label>
 
+        {/* Birthday */}
         <label className="block">
           <span className="text-sm text-gray-700">Birthday</span>
           <input
@@ -185,6 +236,7 @@ export default function ProfileForm() {
           />
         </label>
 
+        {/* Height */}
         <label className="block">
           <span className="text-sm text-gray-700">Height (cm)</span>
           <input
@@ -203,6 +255,7 @@ export default function ProfileForm() {
           />
         </label>
 
+        {/* Weight */}
         <label className="block">
           <span className="text-sm text-gray-700">Weight (kg)</span>
           <input
@@ -221,6 +274,7 @@ export default function ProfileForm() {
           />
         </label>
 
+        {/* Sex */}
         <label className="block">
           <span className="text-sm text-gray-700">Sex</span>
           <select
@@ -232,6 +286,93 @@ export default function ProfileForm() {
             <option value="female">Female</option>
             <option value="other">Other / Prefer not to say</option>
           </select>
+        </label>
+      </div>
+
+      {/* Onboarding answers (editable) */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Goal */}
+        <label className="block">
+          <span className="text-sm text-gray-700">Goal</span>
+          <select
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={profile.goal ?? ""}
+            onChange={(e) => setProfile((p) => ({ ...p, goal: e.target.value as Goal }))}
+          >
+            <option value="">Select goal</option>
+            <option value="weight_loss">Weight Loss</option>
+            <option value="cardio">Cardio</option>
+            <option value="strength">Strength</option>
+            <option value="mobility">Mobility</option>
+          </select>
+        </label>
+
+        {/* Intensity */}
+        <label className="block">
+          <span className="text-sm text-gray-700">Preferred Intensity</span>
+          <select
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={profile.preferredIntensity ?? ""}
+            onChange={(e) =>
+              setProfile((p) => ({ ...p, preferredIntensity: e.target.value as Intensity }))
+            }
+          >
+            <option value="">Select intensity</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+
+        {/* Share with coach */}
+        <label className="block">
+          <span className="text-sm text-gray-700">Share with Coach</span>
+          <div className="mt-2">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={!!profile.shareWithCoach}
+                onChange={(e) => setProfile((p) => ({ ...p, shareWithCoach: e.target.checked }))}
+              />
+              Allow my assigned coach to view my health profile
+            </label>
+          </div>
+        </label>
+      </div>
+
+      {/* Equipment pills */}
+      <div className="mt-6">
+        <span className="text-sm text-gray-700 block mb-2">Equipment</span>
+        <div className="flex flex-wrap gap-2">
+          {EQUIPMENT.map((eq) => {
+            const active = (profile.equipment ?? []).includes(eq);
+            return (
+              <button
+                key={eq}
+                type="button"
+                onClick={() => toggleEquip(eq)}
+                className={`px-3 py-1 rounded-full border ${
+                  active ? "bg-black text-white" : "bg-white"
+                }`}
+              >
+                {eq.replace(/_/g, " ")}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div className="mt-4">
+        <label className="block">
+          <span className="text-sm text-gray-700">Notes / Preferences</span>
+          <textarea
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            rows={3}
+            placeholder="Anything we should know (injuries, constraints, preferences)…"
+            value={profile.notes ?? ""}
+            onChange={(e) => setProfile((p) => ({ ...p, notes: e.target.value }))}
+          />
         </label>
       </div>
 
