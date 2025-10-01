@@ -143,7 +143,7 @@ export default function ProfileForm() {
     setMsg(null);
     setErr(null);
     try {
-      // 1) users/{uid} (your existing place for display/birthday/basic stats)
+      // 1) users/{uid} (your existing place for display/birthday/basic statsd)
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
         name: profile.displayName ?? null,
