@@ -13,6 +13,7 @@ import { useContent } from "@/context/ContentProvider";
 import { Hero } from "@/components/hero";
 import { useAuth } from "@/context/AuthContext";
 import { Download } from "@/components/download"; 
+import Chatbot from "@/components/Chatbot";
 
 export default function Home() {
   const router = useRouter();
@@ -83,8 +84,14 @@ export default function Home() {
       <Testimonials testimonials={testimonials} />
       <HowItWorks steps={howItWorks} />
       
+
       {/* ✅ Download section on the home page */}
       <Download />
+
+      {/* AI Chatbot section */}
+      <div className="my-8">
+        <Chatbot />
+      </div>
 
       {/* Modals (kept so Pricing CTA continues to work) */}
       <SignUpModal
