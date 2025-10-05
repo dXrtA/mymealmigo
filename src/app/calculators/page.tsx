@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { SignUpModal } from "@/components/sign-up-modal";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import BmiCalculator from "@/components/bmiCalculator";
@@ -92,8 +91,6 @@ export default function CalculatorsPage() {
         </div>
       )}
 
-      {/* Modal lives here so guests can open it */}
-      <SignUpModal isOpen={showSignup} onClose={() => setShowSignup(false)} />
 
       <div className="max-w-3xl mx-auto space-y-6">
         <BmiCalculator

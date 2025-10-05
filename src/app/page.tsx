@@ -1,3 +1,4 @@
+// src/app/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,8 +8,6 @@ import { Features } from "@/components/features";
 import { Pricing } from "@/components/pricing";
 import { Testimonials } from "@/components/testimonials";
 import { HowItWorks } from "@/components/how-it-works";
-import { SignUpModal } from "@/components/sign-up-modal";
-import UpgradeToPremiumModal from "@/components/UpgradeToPremiumModal";
 import { useContent } from "@/context/ContentProvider";
 import { Hero } from "@/components/hero";
 import { useAuth } from "@/context/AuthContext";
@@ -16,10 +15,6 @@ import { Download } from "@/components/download";
 
 export default function Home() {
   const router = useRouter();
-  const [showSignUp, setShowSignUp] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"free" | "premium" | null>(null);
-
   const { hero, features, howItWorks, pricing, testimonials, isLoading } = useContent();
   const { user } = useAuth();
 
@@ -28,25 +23,6 @@ export default function Home() {
   }
 
   const mappedFeatures = features;
-
-  // still used by Pricing (kept so its CTA works)
-  const openModal = (role?: "free" | "premium") => {
-    if (user) {
-      if (role === "premium") {
-        setShowUpgrade(true);
-      } else {
-        router.push("/account");
-      }
-      return;
-    }
-    setSelectedRole(role || null);
-    setShowSignUp(true);
-  };
-
-  const closeModal = () => {
-    setShowSignUp(false);
-    setSelectedRole(null);
-  };
 
   return (
     <div className="font-sans antialiased text-gray-800 bg-white">
@@ -61,7 +37,6 @@ export default function Home() {
         imageURL={hero.imageURL}
         mediaType={hero.mediaType || "image"}
       >
-        {/* Unimeal-style CTA: Male / Female — no Get Started, no Learn More, no About Project */}
         <div className="flex flex-col sm:flex-row gap-3">
           <Link
             href="/onboarding?sex=male"
@@ -79,23 +54,15 @@ export default function Home() {
       </Hero>
 
       <Features features={mappedFeatures} />
-      <Pricing plans={pricing} onOpenModal={openModal} />
+
+      {/* Display-only pricing (no buttons / no click actions) */}
+      <Pricing plans={pricing} hideButtons />
+
       <Testimonials testimonials={testimonials} />
       <HowItWorks steps={howItWorks} />
-      
-      {/* ✅ Download section on the home page */}
-      <Download />
 
-      {/* Modals (kept so Pricing CTA continues to work) */}
-      <SignUpModal
-        isOpen={showSignUp}
-        onClose={closeModal}
-        initialRole={selectedRole || undefined}
-      />
-      <UpgradeToPremiumModal
-        isOpen={showUpgrade}
-        onClose={() => setShowUpgrade(false)}
-      />
+      {/* Download section */}
+      <Download />
     </div>
   );
 }

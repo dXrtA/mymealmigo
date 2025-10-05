@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword, User as FirebaseUser, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, User as FirebaseUser, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getClientAuth, db } from "@/lib/firebase";
 import { SignUpModal } from "@/components/sign-up-modal";
@@ -32,11 +32,10 @@ export default function LoginPage() {
       console.log("Document data:", userDoc.data());
 
       if (userDoc.exists() && userDoc.data()?.role?.toLowerCase() === "admin") {
-        console.log("Redirecting to /admin/dashboard");
         router.push("/admin/dashboard");
       } else {
-        console.log("Redirecting to /");
-        router.push("/"); // ✅ Home page for non-admins
+        await signOut(auth);
+        setError("Only admin accounts can sign in.");
       }
     } catch (err) {
       console.error("Error checking user role:", err);
@@ -109,17 +108,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{" "}
-            <button
-              onClick={() => setIsSignUpModalOpen(true)}
-              className="font-medium text-[#58e221] hover:text-[#58e221]/90"
-            >
-              create a new account
-            </button>
-          </p>
-        </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Admin Login</h2>
+          </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>

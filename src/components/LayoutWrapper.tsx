@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Youtube, Mail, Phone, Lock } from 'lucide-react'; // ← added Lock
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -116,6 +116,14 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                       <Phone className="h-4 w-4 mr-2" />
                       {settings.general.phoneNumber || 'Phone not set'}
                     </span>
+                  </li>
+
+                  {/* Admin login moved to footer */}
+                  <li>
+                    <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
+                      <Lock className="h-4 w-4 mr-2" />
+                      Admin login
+                    </a>
                   </li>
                 </ul>
 
