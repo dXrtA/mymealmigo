@@ -43,7 +43,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const router = useRouter();
   const isAdminRoute = pathname?.startsWith('/admin');
 
-  // use real auth state
+  // real auth state
   const { user, isAdmin } = useAuth();
   const isLoggedIn = !!user;
 
@@ -55,7 +55,8 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     (async () => {
       try {
         const ref = doc(db, 'settings', 'main');
-        const snap = await getDoc(ref); // one-time read, no listener
+        const snap = await getDoc(ref);
+
         if (cancelled) return;
 
         if (snap.exists()) {
@@ -95,7 +96,9 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       {!isAdminRoute && (
         <footer className="bg-white text-gray-800 py-12 border-t border-[#2fe93b]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* ⬅️ changed to 4 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* Brand / about */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">
                   {settings.general.siteName}
@@ -103,6 +106,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 <p className="text-gray-600">{settings.general.siteDescription}</p>
               </div>
 
+              {/* Quick Links */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Quick Links</h3>
                 <ul className="space-y-2">
@@ -116,6 +120,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 </ul>
               </div>
 
+              {/* Connect */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Connect</h3>
                 <ul className="space-y-2">
@@ -131,26 +136,6 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                       {settings.general.phoneNumber || 'Phone not set'}
                     </span>
                   </li>
-
-                  {/* Show Admin login when logged out; show Logout when admin is logged in */}
-                  {!isLoggedIn ? (
-                    <li>
-                      <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
-                        <Lock className="h-4 w-4 mr-2" />
-                        Admin login
-                      </a>
-                    </li>
-                  ) : isAdmin ? (
-                    <li>
-                      <button
-                        onClick={handleLogout}
-                        className="text-gray-600 hover:text-[#58e221] flex items-center"
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                      </button>
-                    </li>
-                  ) : null}
                 </ul>
 
                 {activeSocialLinks.length > 0 && (
@@ -171,6 +156,31 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Admin (new column) */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Admin</h3>
+                <ul className="space-y-2">
+                  {!isLoggedIn ? (
+                    <li>
+                      <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
+                        <Lock className="h-4 w-4 mr-2" />
+                        Admin login
+                      </a>
+                    </li>
+                  ) : isAdmin ? (
+                    <li>
+                      <button
+                        onClick={handleLogout}
+                        className="text-gray-600 hover:text-[#58e221] flex items-center"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </button>
+                    </li>
+                  ) : null}
+                </ul>
               </div>
             </div>
 
