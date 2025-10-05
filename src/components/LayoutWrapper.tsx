@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Facebook, Twitter, Instagram, Youtube, Mail, Phone, Lock } from 'lucide-react'; // ← added Lock
-import { db } from '@/lib/firebase';
+import { usePathname, useRouter } from 'next/navigation';
+import { Facebook, Twitter, Instagram, Youtube, Mail, Phone, Lock, LogOut } from 'lucide-react';
+import { db, getClientAuth } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext';
 
 interface Settings {
   general: {
@@ -38,35 +40,37 @@ const defaultSettings: Settings = {
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isAdminRoute = pathname?.startsWith('/admin');
+
+  // use real auth state
+  const { user, isAdmin } = useAuth();
+  const isLoggedIn = !!user;
+
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [isLoggedIn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const ref = doc(db, "settings", "main");
+        const ref = doc(db, 'settings', 'main');
         const snap = await getDoc(ref); // one-time read, no listener
-
         if (cancelled) return;
 
         if (snap.exists()) {
-          console.log("Footer settings loaded:", snap.data());
           setSettings(snap.data() as Settings);
         } else {
-          console.log("No settings document found, using defaults");
           setSettings(defaultSettings);
         }
       } catch (error) {
-        console.error("Error fetching footer settings:", error);
+        console.error('Error fetching footer settings:', error);
         if (!cancelled) setSettings(defaultSettings);
       }
     })();
 
     return () => {
-      cancelled = true; // prevents state update after unmount
+      cancelled = true;
     };
   }, []);
 
@@ -74,6 +78,16 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const activeSocialLinks = Object.entries(settings.socialLinks).filter(
     ([, link]) => link.trim() !== ''
   );
+
+  const handleLogout = async () => {
+    try {
+      const auth = getClientAuth();
+      await signOut(auth);
+      router.push('/');
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
+  };
 
   return (
     <>
@@ -118,13 +132,25 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                     </span>
                   </li>
 
-                  {/* Admin login moved to footer */}
-                  <li>
-                    <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
-                      <Lock className="h-4 w-4 mr-2" />
-                      Admin login
-                    </a>
-                  </li>
+                  {/* Show Admin login when logged out; show Logout when admin is logged in */}
+                  {!isLoggedIn ? (
+                    <li>
+                      <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
+                        <Lock className="h-4 w-4 mr-2" />
+                        Admin login
+                      </a>
+                    </li>
+                  ) : isAdmin ? (
+                    <li>
+                      <button
+                        onClick={handleLogout}
+                        className="text-gray-600 hover:text-[#58e221] flex items-center"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </button>
+                    </li>
+                  ) : null}
                 </ul>
 
                 {activeSocialLinks.length > 0 && (
