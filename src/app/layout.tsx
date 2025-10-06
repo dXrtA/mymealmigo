@@ -37,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             `,
           }}
         />
-      </head>
+  <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+  <script src="https://files.bpcontent.cloud/2025/10/06/14/20251006142047-5STW4U7G.js" defer></script>
+  </head>
       <body
         className={`${inter.className} bg-white min-h-screen`}
         suppressHydrationWarning // Temporary for development
