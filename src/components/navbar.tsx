@@ -98,35 +98,7 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right: Auth actions */}
-          <div className="hidden sm:flex sm:items-center sm:space-x-4">
-            {user ? (
-              <>
-                <Link
-                  href="/account"
-                  className="text-gray-700 text-sm font-medium hidden md:block truncate max-w-[150px] hover:text-[#58e221]"
-                  title="Account"
-                >
-                  {user.displayName || user.email || "Account"}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-[#58e221] focus:outline-none focus:ring-2 focus:ring-[#58e221]"
-                  aria-label="Logout"
-                >
-                  <LogOut className="mr-2 h-5 w-5" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#58e221]"
-              >
-                Login
-              </Link>
-            )}
-          </div>
+          
 
           {/* Mobile menu button */}
           <div className="flex items-center sm:hidden">
@@ -200,33 +172,7 @@ export function Navbar() {
               About Project
             </Link>
 
-            {user ? (
-              <>
-                <Link
-                  href="/account"
-                  className="block pl-3 pr-4 py-2 text-base font-medium text-gray-700 hover:bg-gray-50"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {user.displayName || user.email || "Account"}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center w-full pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-[#58e221]"
-                  aria-label="Logout"
-                >
-                  <LogOut className="mr-2 h-5 w-5" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-500 hover:bg-gray-50"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Login
-              </Link>
-            )}
+  
           </div>
         </div>
       )}

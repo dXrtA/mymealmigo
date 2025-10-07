@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { usePathname, useRouter } from 'next/navigation';
+import { Facebook, Twitter, Instagram, Youtube, Mail, Phone, Lock, LogOut } from 'lucide-react';
+import { db, getClientAuth } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '@/context/AuthContext';
 
 interface Settings {
   general: {
@@ -38,35 +40,38 @@ const defaultSettings: Settings = {
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isAdminRoute = pathname?.startsWith('/admin');
+
+  // real auth state
+  const { user, isAdmin } = useAuth();
+  const isLoggedIn = !!user;
+
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [isLoggedIn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        const ref = doc(db, "settings", "main");
-        const snap = await getDoc(ref); // one-time read, no listener
+        const ref = doc(db, 'settings', 'main');
+        const snap = await getDoc(ref);
 
         if (cancelled) return;
 
         if (snap.exists()) {
-          console.log("Footer settings loaded:", snap.data());
           setSettings(snap.data() as Settings);
         } else {
-          console.log("No settings document found, using defaults");
           setSettings(defaultSettings);
         }
       } catch (error) {
-        console.error("Error fetching footer settings:", error);
+        console.error('Error fetching footer settings:', error);
         if (!cancelled) setSettings(defaultSettings);
       }
     })();
 
     return () => {
-      cancelled = true; // prevents state update after unmount
+      cancelled = true;
     };
   }, []);
 
@@ -75,13 +80,25 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     ([, link]) => link.trim() !== ''
   );
 
+  const handleLogout = async () => {
+    try {
+      const auth = getClientAuth();
+      await signOut(auth);
+      router.push('/');
+    } catch (e) {
+      console.error('Logout failed:', e);
+    }
+  };
+
   return (
     <>
       {children}
       {!isAdminRoute && (
         <footer className="bg-white text-gray-800 py-12 border-t border-[#2fe93b]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* ⬅️ changed to 4 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {/* Brand / about */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">
                   {settings.general.siteName}
@@ -89,6 +106,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 <p className="text-gray-600">{settings.general.siteDescription}</p>
               </div>
 
+              {/* Quick Links */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Quick Links</h3>
                 <ul className="space-y-2">
@@ -102,6 +120,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                 </ul>
               </div>
 
+              {/* Connect */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Connect</h3>
                 <ul className="space-y-2">
@@ -137,6 +156,31 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Admin (new column) */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4 text-[#58e221]">Admin</h3>
+                <ul className="space-y-2">
+                  {!isLoggedIn ? (
+                    <li>
+                      <a href="/login" className="text-gray-600 hover:text-[#58e221] flex items-center">
+                        <Lock className="h-4 w-4 mr-2" />
+                        Admin login
+                      </a>
+                    </li>
+                  ) : isAdmin ? (
+                    <li>
+                      <button
+                        onClick={handleLogout}
+                        className="text-gray-600 hover:text-[#58e221] flex items-center"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </button>
+                    </li>
+                  ) : null}
+                </ul>
               </div>
             </div>
 
